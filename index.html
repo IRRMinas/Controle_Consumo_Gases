@@ -401,6 +401,14 @@
     .cons-grupos th, .cons-grupos td { border:1px solid #444; padding:6px 10px; } .cons-grupos th { background:#d9d9d9; }
     .cons-grupos td.n { text-align:right; } .cons-grupos tr.tg td { background:#808080; color:#fff; font-weight:bold; }
     .cons-grupos .geral { display:flex; justify-content:space-between; border:1px solid #000; padding:8px 12px; font-weight:bold; margin-bottom:12px; background:#fff; }
+
+    /* ajuste fino: cabe na tela sem barra lateral */
+    table.gases-table th, table.gases-table td { padding: 4px 5px !important; font-size: 13.5px !important; }
+    .gases-hdr-month { font-size: 13px !important; min-width: 84px !important; }
+    .gases-val-cell input { font-size: 13.5px !important; height: 30px; min-width: 80px; padding: 2px 4px; }
+    .gases-id-cell { font-size: 12.5px !important; }
+    .gases-footer-row td { font-size: 13.5px !important; }
+    .gases-hdr-big { font-size: 14px !important; }
   </style>
 </head>
 <body>
@@ -1132,10 +1140,11 @@
           if (m2 >= 1 && m2 <= 12) document.getElementById('selMesFim').value = m2;
         }
 
-        const novosDados = [];
+        const novosDados = []; let totalRel = null;
         for (let i = 8; i < rows.length; i++) {
           const r = rows[i];
-          if (!r || String(r[2]).trim() === 'Total:') break;
+          if (!r) break;
+          if (String(r[2]).trim() === 'Total:') { totalRel = parseFloat(r[3]) || 0; break; }
           const codRaw = String(r[0] || '').trim();
           if (codRaw && !isNaN(Number(codRaw))) {
             novosDados.push({
@@ -1152,7 +1161,7 @@
           return;
         }
 
-        tesouroData = novosDados;
+        tesouroData = novosDados; totalRelatorio = totalRel;
         document.getElementById('lblUltimaCarga').textContent = `Última carga: ${file.name} (${novosDados.length} unidades)`;
         recalcAll();
         salvarTesouroNoGoogleSheets(periodoLido);
@@ -1305,6 +1314,7 @@
             document.getElementById('lblPeriodoConsumo').textContent = data.periodo;
           }
           if (data.consumo) consumoPlanilha = data.consumo;
+          if (data.totalRelatorio != null) totalRelatorio = Number(data.totalRelatorio) || 0;
           syncErro = false;
           if (data.ultCarga) {
             document.getElementById('lblUltimaCarga').textContent = data.ultCarga;
@@ -1330,6 +1340,7 @@
           body: JSON.stringify({ action: "salvarGases", gases: gasesData })
         });
         if (mostrarAviso) showToast("Gastos de gases salvos na Planilha Google!");
+        verificarSalvamento();
       } catch (e) {
         console.error(e);
       }
@@ -1342,7 +1353,7 @@
           method: "POST",
           mode: "no-cors",
           headers: { "Content-Type": "text/plain;charset=utf-8" },
-          body: JSON.stringify({ action: "importarTesouro", periodo: periodo, tesouro: tesouroData })
+          body: JSON.stringify({ action: "importarTesouro", periodo: periodo, tesouro: tesouroData, totalRelatorio: totalRelatorio })
         });
       } catch (e) {
         console.error(e);
@@ -1353,6 +1364,7 @@
     // =========================================================================
     // MELHORIAS: CONSOLIDADO POR GRUPO (igual ao fim da planilha VBA) + ALERTAS
     // =========================================================================
+    let totalRelatorio = null, verifTimer = null;
     let syncErro = false, consumoPlanilha = null;
     const ORDEM_G = ["VDP","APOIO","PLAT","V&R","VDG","DIR","VDE","VDI"];
     function renderConsGrupos() {
@@ -1384,8 +1396,16 @@
       const fora = gasesData.reduce((a,g)=>a+g.m.reduce((s,v,i)=>(i+1<mIni||i+1>mFim)?s+(Number(v)||0):s,0),0);
       if (fora > 0) A.push({n:'aviso', t:'Gás fora do período selecionado', d:`R$ ${fmtNum(fora)} lançado em meses fora de ${nm[mIni-1]} a ${nm[mFim-1]} não entra no relatório por unidade.`});
       for (let m = mIni-1; m < mFim; m++) if (!gasesData.some(g => Number(g.m[m]))) A.push({n:'aviso', t:'Nenhum gás lançado em '+nm[m], d:'Mês dentro do período, mas sem valores em GASES_MENSAL.'});
-      const dif = Math.abs(somaTes - totConsumo);
-      if (dif >= 0.01) A.push({n:'erro', t:'Tesouro × consolidado não confere', d:'Diferença de R$ '+fmtNum(dif)+' (normalmente COD sem cadastro).'});
+      const ref = (totalRelatorio != null && totalRelatorio > 0) ? totalRelatorio : somaTes;
+      const dif = ref - totConsumo;
+      if (Math.abs(dif) >= 0.01) {
+        const semCad = tesouroData.filter(t => !cods.has(String(t.c).trim().padStart(9,'0')));
+        const somaSem = semCad.reduce((a,t)=>a+(Number(t.v)||0),0);
+        let onde = semCad.length ? ` COD sem cadastro somam R$ ${fmtNum(somaSem)}: ${semCad.map(t=>t.c+' ('+t.d+')').join('; ')}.` : '';
+        if (totalRelatorio > 0 && Math.abs(totalRelatorio - somaTes) >= 0.01) onde += ` A soma das linhas do relatório (R$ ${fmtNum(somaTes)}) difere do Total do relatório — linha faltando ou COD digitado errado no Tesouro.`;
+        if (!onde) onde = ' Todos os COD estão cadastrados; confira se o relatório foi colado inteiro.';
+        A.push({n:'erro', t:'CONSUMO × Total do relatório NÃO confere (diferença R$ '+fmtNum(dif)+')', d:`Total do relatório: R$ ${fmtNum(ref)} · TOTAL GERAL da aba CONSUMO (coluna consumo): R$ ${fmtNum(totConsumo)}.`+onde});
+      }
       if (consumoPlanilha && (Math.abs(consumoPlanilha.cons-totConsumo) > 0.01 || Math.abs(consumoPlanilha.gas-totGas) > 0.01))
         A.push({n:'erro', t:'Aba CONSUMO da planilha diverge do sistema', d:`Planilha: consumo R$ ${fmtNum(consumoPlanilha.cons)} / gás R$ ${fmtNum(consumoPlanilha.gas)}. Sistema: R$ ${fmtNum(totConsumo)} / R$ ${fmtNum(totGas)}. Aguarde o recálculo ou recarregue.`});
       return A;
@@ -1395,6 +1415,24 @@
       cnt.textContent = A.length; cnt.className = 'cnt' + (A.length ? '' : ' ok');
       el.innerHTML = A.length ? A.map(a => `<div class="alerta ${a.n}"><div>${a.n==='erro'?'⛔':'⚠️'}</div><div><b>${a.t}</b><span>${a.d}</span></div></div>`).join('')
         : '<div class="alerta ok"><div>✅</div><div><b>Tudo certo</b><span>Nenhum problema encontrado. Pronto para fechar.</span></div></div>';
+    }
+
+
+    function verificarSalvamento() {
+      clearTimeout(verifTimer);
+      verifTimer = setTimeout(async () => {
+        try {
+          const d = await (await fetch(GOOGLE_SCRIPT_URL)).json();
+          if (d && d.consumo) {
+            consumoPlanilha = d.consumo;
+            const t = calcularConsolidado();
+            const ok = Math.abs(d.consumo.gas - t.totGas) < 0.01 && Math.abs(d.consumo.cons - t.totConsumo) < 0.01;
+            showToast(ok ? 'Planilha confirmou: aba CONSUMO atualizada (gás R$ ' + fmtNum(d.consumo.gas) + ')' : 'ATENÇÃO: a planilha CONSUMO não bate com o sistema — veja ALERTAS');
+            syncErro = false;
+          } else showToast('Salvo, mas o script não devolveu os totais da CONSUMO: atualize o Codigo.gs (nova versão).');
+        } catch (e) { syncErro = true; }
+        renderAlertas();
+      }, 3000);
     }
 
     function recalcAll() {
