@@ -436,6 +436,10 @@
     tr.spacer td { border: none !important; height: 12px; padding: 0 !important; background:#fff !important; }
     table.consumo-table tr.grp-tot td { background: var(--gray-tot1); font-weight: bold; }
     table.consumo-table tr.grp-tot td.yel-tot { background: var(--gray-tot2); text-align:right; }
+    @page { size: landscape; margin: 10mm; }
+    .frm-un { display:grid; grid-template-columns:140px 130px 120px 1fr auto; gap:8px; align-items:end; margin:10px 0; }
+    .frm-un label { font-size:12px; color:#444; display:block; } .frm-un input,.frm-un select { width:100%; padding:7px; border:1px solid #bbb; border-radius:6px; box-sizing:border-box; }
+    @media (max-width:800px){ .frm-un { grid-template-columns:1fr 1fr; } }
   </style>
 </head>
 <body>
@@ -487,9 +491,26 @@
     <button class="tab-btn" onclick="openTab('tabAlertas', this)">
       <span class="tab-dot" style="background:#c0392b"></span> 5. ALERTAS <span class="cnt ok" id="cntAlertas">0</span>
     </button>
+    <button class="tab-btn" onclick="openTab('tabUnidades', this)">
+      <span class="tab-dot" style="background:#6b4fa0"></span> 6. UNIDADES
+    </button>
   </div>
 
   <div class="container">
+    <div id="tabUnidades" class="tab-panel">
+      <h2 style="margin:6px 0">Cadastro de unidades</h2>
+      <p style="margin:0 0 8px;color:#555;font-size:13px">Unidade nova ou COD do Tesouro sem cadastro? Preencha abaixo: grava na aba UNIDADES da planilha e já vale para todo o sistema. COD já existente = atualiza sigla, descrição e grupo.</p>
+      <div class="frm-un">
+        <div><label>Grupo</label><select id="unGrupo"></select></div>
+        <div><label>COD. UNIDADE (9 dígitos)</label><input id="unCod" maxlength="9" inputmode="numeric" placeholder="031000000" /></div>
+        <div><label>Sigla</label><input id="unSigla" /></div>
+        <div><label>Descrição</label><input id="unDesc" /></div>
+        <button class="btn btn-green" onclick="cadastrarUnidade()">Salvar unidade</button>
+      </div>
+      <p style="margin:4px 0"><input id="filtroUn" placeholder="Filtrar por COD, sigla, nome ou grupo…" oninput="renderUnidades()" style="padding:7px;width:320px;border:1px solid #bbb;border-radius:6px" />
+        <button class="btn btn-mini" onclick="definirToken()" title="Só necessário se o Code.gs tiver um código de acesso">🔑 Código de acesso</button></p>
+      <div style="overflow:auto;max-height:60vh"><table style="width:100%"><thead><tr><th>Grupo</th><th>COD. UNIDADE</th><th>Sigla</th><th>Descrição</th><th></th></tr></thead><tbody id="tbodyUnidades"></tbody></table></div>
+    </div>
     <div id="tabAlertas" class="tab-panel">
       <h2 style="margin:6px 0">Alertas e conferência automática</h2>
       <p style="margin:0 0 8px;color:#555;font-size:13px">Tudo que precisa de atenção antes de fechar o mês. Atualiza sozinho a cada lançamento ou importação.</p>
@@ -945,11 +966,10 @@
     function popularSelectRapidoGases() {
       const sel = document.getElementById('quickGasesUnidade');
       sel.innerHTML = '';
-      gasesData.forEach((row, idx) => {
-        const u = findUnidade(row.c);
+      UNIDADES.forEach(u => {
         const opt = document.createElement('option');
-        opt.value = idx;
-        opt.textContent = `${row.c} · ${u.s || 'S/S'} — ${u.d}`;
+        opt.value = u.c;
+        opt.textContent = `${u.c} · ${u.s || 'S/S'} — ${u.d}`;
         sel.appendChild(opt);
       });
     }
@@ -1010,20 +1030,21 @@
     }
 
     function atualizarCelulaGas(rIdx, mIdx, novoValor) {
-      gasesData[rIdx].m[mIdx] = parseFloat(novoValor) || 0;
+      const v = parseFloat(novoValor) || 0;
+      gasesData[rIdx].m[mIdx] = v;
       recalcAll();
-      salvarGasesNoGoogleSheets(false);
+      salvarCelulaGas(gasesData[rIdx].c, mIdx, v, false);
     }
 
     function lancarGasRapido() {
-      const rIdx = parseInt(document.getElementById('quickGasesUnidade').value, 10);
+      const cod = document.getElementById('quickGasesUnidade').value;
       const mIdx = parseInt(document.getElementById('quickGasesMes').value, 10);
       const val = parseFloat(document.getElementById('quickGasesValor').value) || 0;
-      if (!gasesData[rIdx]) { showToast("Nenhuma unidade selecionada."); return; }
-      gasesData[rIdx].m[mIdx] = val;
+      if (!cod) { showToast("Nenhuma unidade selecionada."); return; }
+      linhaGas(cod).m[mIdx] = val;
       document.getElementById('quickGasesValor').value = '';
       recalcAll();
-      salvarGasesNoGoogleSheets(true);
+      salvarCelulaGas(cod, mIdx, val, true);
     }
 
     // =========================================================================
@@ -1334,10 +1355,13 @@
       const badge = document.getElementById('badgeSync');
       try {
         badge.textContent = "SINCRONIZANDO...";
-        const res = await fetch(GOOGLE_SCRIPT_URL);
+        const res = await fetch(urlGet());
         const data = await res.json();
+        if (data && data.ok === false) { badge.className = "badge-warn"; badge.textContent = "CÓDIGO DE ACESSO NECESSÁRIO (aba UNIDADES → 🔑)"; return; }
         if (data && data.ok) {
-          if (data.gases && data.gases.length) { gasesData = data.gases; popularSelectRapidoGases(); }
+          if (data.unidades && data.unidades.length) { UNIDADES.length = 0; data.unidades.forEach(u => UNIDADES.push(u)); }
+          if (data.gases && data.gases.length) gasesData = data.gases;
+          popularSelectRapidoGases();
           if (data.tesouro && data.tesouro.length) tesouroData = data.tesouro;
           if (data.periodo) aplicarPeriodo(data.periodo);
           if (data.consumo) consumoPlanilha = data.consumo;
@@ -1360,12 +1384,7 @@
     async function salvarGasesNoGoogleSheets(mostrarAviso) {
       if (!GOOGLE_SCRIPT_URL) return;
       try {
-        await fetch(GOOGLE_SCRIPT_URL, {
-          method: "POST",
-          mode: "no-cors",
-          headers: { "Content-Type": "text/plain;charset=utf-8" },
-          body: JSON.stringify({ action: "salvarGases", gases: gasesData })
-        });
+        await postGS({ action: "salvarGases", gases: gasesData });
         if (mostrarAviso) showToast("Gastos de gases salvos na Planilha Google!");
         verificarSalvamento();
       } catch (e) {
@@ -1376,12 +1395,7 @@
     async function salvarTesouroNoGoogleSheets(periodo) {
       if (!GOOGLE_SCRIPT_URL) return;
       try {
-        await fetch(GOOGLE_SCRIPT_URL, {
-          method: "POST",
-          mode: "no-cors",
-          headers: { "Content-Type": "text/plain;charset=utf-8" },
-          body: JSON.stringify({ action: "importarTesouro", periodo: periodo, tesouro: tesouroData, totalRelatorio: totalRelatorio })
-        });
+        await postGS({ action: "importarTesouro", periodo: periodo, tesouro: tesouroData, totalRelatorio: totalRelatorio });
       } catch (e) {
         console.error(e);
       }
@@ -1415,7 +1429,7 @@
       if (syncErro) A.push({n:'erro', t:'Sem conexão com o Google Sheets', d:'Os dados mostrados são locais e NÃO estão sendo salvos na planilha. Verifique a permissão/implantação do Apps Script.'});
       const tes = {}; let somaTes = 0;
       tesouroData.forEach(t => { const c = String(t.c).trim().padStart(9,'0'); tes[c] = (tes[c]||0)+1; somaTes += Number(t.v)||0;
-        if (!cods.has(c)) A.push({n:'erro', t:'COD do Tesouro sem cadastro: '+c, d:`${t.d} — R$ ${fmtNum(t.v)} ficaria fora do consolidado. Cadastre em UNIDADES.`}); });
+        if (!cods.has(c)) A.push({n:'erro', t:'COD do Tesouro sem cadastro: '+c, d:`${t.d} — R$ ${fmtNum(t.v)} ficaria fora do consolidado.`, cod:c, desc:t.d}); });
       Object.keys(tes).filter(c => tes[c] > 1).forEach(c => A.push({n:'aviso', t:'COD duplicado no Tesouro: '+c, d:'Aparece '+tes[c]+' vezes; os valores são somados.'}));
       gasesData.forEach(g => { const c = String(g.c).trim().padStart(9,'0');
         if (!cods.has(c)) A.push({n:'erro', t:'COD de gás não cadastrado: '+c, d:'Gás lançado em GASES_MENSAL sem unidade correspondente — não entra no consolidado.'});
@@ -1442,7 +1456,7 @@
     function renderAlertas() {
       const A = computeAlertas(), el = document.getElementById('listaAlertas'), cnt = document.getElementById('cntAlertas');
       cnt.textContent = A.length; cnt.className = 'cnt' + (A.length ? '' : ' ok');
-      el.innerHTML = A.length ? A.map(a => `<div class="alerta ${a.n}"><div>${a.n==='erro'?'⛔':'⚠️'}</div><div><b>${a.t}</b><span>${a.d}</span></div></div>`).join('')
+      el.innerHTML = A.length ? A.map(a => `<div class="alerta ${a.n}"><div>${a.n==='erro'?'⛔':'⚠️'}</div><div><b>${a.t}</b><span>${a.d}</span>${a.cod?`<button class="btn btn-mini" onclick="prefillUnidade('${a.cod}','${String(a.desc).replace(/'/g,'’')}')">Cadastrar agora</button>`:''}</div></div>`).join('')
         : '<div class="alerta ok"><div>✅</div><div><b>Tudo certo</b><span>Nenhum problema encontrado. Pronto para fechar.</span></div></div>';
     }
 
@@ -1451,7 +1465,7 @@
       clearTimeout(verifTimer);
       verifTimer = setTimeout(async () => {
         try {
-          const d = await (await fetch(GOOGLE_SCRIPT_URL)).json();
+          const d = await (await fetch(urlGet())).json();
           if (d && d.consumo) {
             consumoPlanilha = d.consumo;
             const t = calcularConsolidado();
@@ -1464,7 +1478,62 @@
       }, 3000);
     }
 
+    // ---------- Acesso, gravação por célula e cadastro de unidades ----------
+    function tokenAcesso() { try { return localStorage.getItem('tokenGases') || ''; } catch (e) { return ''; } }
+    function urlGet() { const t = tokenAcesso(); return GOOGLE_SCRIPT_URL + (t ? (GOOGLE_SCRIPT_URL.includes('?') ? '&' : '?') + 'token=' + encodeURIComponent(t) : ''); }
+    async function postGS(obj) {
+      if (!GOOGLE_SCRIPT_URL) return;
+      obj.token = tokenAcesso();
+      await fetch(GOOGLE_SCRIPT_URL, { method: 'POST', mode: 'no-cors', headers: { 'Content-Type': 'text/plain;charset=utf-8' }, body: JSON.stringify(obj) });
+    }
+    function definirToken() {
+      const t = prompt('Código de acesso do Apps Script (vazio = remover):', tokenAcesso());
+      if (t === null) return;
+      try { localStorage.setItem('tokenGases', t.trim()); } catch (e) {}
+      sincronizarDoGoogleSheets();
+    }
+    function linhaGas(cod) {
+      cod = String(cod).trim().padStart(9, '0');
+      let g = gasesData.find(x => String(x.c).trim().padStart(9, '0') === cod);
+      if (!g) { g = { c: cod, m: new Array(12).fill(0) }; gasesData.push(g); }
+      return g;
+    }
+    async function salvarCelulaGas(cod, mIdx, valor, aviso) {
+      try {
+        await postGS({ action: 'salvarCelula', c: cod, mes: mIdx, valor: valor });
+        if (aviso) showToast('Gasto lançado e enviado à Planilha Google.');
+        verificarSalvamento();
+      } catch (e) { console.error(e); }
+    }
+    function prefillUnidade(cod, desc) {
+      openTab('tabUnidades', document.querySelectorAll('.tab-btn')[5]);
+      document.getElementById('unCod').value = cod; document.getElementById('unDesc').value = desc;
+      document.getElementById('unSigla').focus();
+    }
+    async function cadastrarUnidade() {
+      const g = document.getElementById('unGrupo').value;
+      const c = document.getElementById('unCod').value.trim();
+      const s = document.getElementById('unSigla').value.trim().toUpperCase();
+      const d = document.getElementById('unDesc').value.trim().toUpperCase();
+      if (!/^\d{1,9}$/.test(c)) { showToast('COD inválido: use só números (até 9 dígitos).'); return; }
+      if (!g || !d) { showToast('Informe o grupo e a descrição.'); return; }
+      const cod = c.padStart(9, '0'), u = UNIDADES.find(x => x.c === cod);
+      if (u) { if (!confirm('O COD ' + cod + ' já existe (' + u.d + '). Atualizar?')) return; u.g = g; u.s = s; u.d = d; }
+      else UNIDADES.push({ g: g, c: cod, s: s, d: d });
+      ['unCod', 'unSigla', 'unDesc'].forEach(i => document.getElementById(i).value = '');
+      popularSelectRapidoGases(); recalcAll();
+      try { await postGS({ action: 'novaUnidade', g: g, c: cod, s: s, d: d }); verificarSalvamento(); showToast('Unidade ' + cod + ' salva.'); } catch (e) { console.error(e); }
+    }
+    function renderUnidades() {
+      const sel = document.getElementById('unGrupo');
+      if (!sel.options.length) sel.innerHTML = Object.keys(NOMES_GRUPOS).map(k => `<option value="${k}">${k} — ${NOMES_GRUPOS[k]}</option>`).join('');
+      const t = (document.getElementById('filtroUn').value || '').toLowerCase().trim();
+      document.getElementById('tbodyUnidades').innerHTML = UNIDADES.filter(u => !t || `${u.g} ${u.c} ${u.s} ${u.d}`.toLowerCase().includes(t))
+        .map(u => `<tr><td class="center">${u.g}</td><td class="center">${u.c}</td><td class="center">${u.s}</td><td>${u.d}</td><td><button class="btn btn-mini" onclick="prefillUnidade('${u.c}','${u.d.replace(/'/g,'’')}');document.getElementById('unSigla').value='${u.s}';document.getElementById('unGrupo').value='${u.g}'">editar</button></td></tr>`).join('');
+    }
+
     function recalcAll() {
+      renderUnidades();
       renderConsGrupos();
       renderAlertas();
       renderGases();
