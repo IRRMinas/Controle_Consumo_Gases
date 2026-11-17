@@ -409,6 +409,33 @@
     .gases-id-cell { font-size: 12.5px !important; }
     .gases-footer-row td { font-size: 13.5px !important; }
     .gases-hdr-big { font-size: 14px !important; }
+
+    /* ===== v3: visual Excel laranja, compacto (sem barra lateral), anos ===== */
+    :root { --or:#fac090; --or-l:#fde9d9; --or-d:#f79646; }
+    .btn-mini { padding: 1px 9px !important; font-size: 14px !important; background:#fff; color:var(--navy); }
+    #tabGases.tab-panel { padding: 10px 12px; }
+    #tabGases .toolbar { margin-bottom: 8px; padding: 6px 10px; }
+    #tabGases .toolbar select, #tabGases .toolbar input, #tabGases .toolbar .btn { font-size: 14px !important; padding: 5px 9px !important; }
+    table.gases-table th, table.gases-table td { padding: 0 5px !important; font-size: var(--gfs,12.5px) !important; }
+    table.gases-table td.gases-val-cell { padding: 0 !important; }
+    .gases-title-row td { font-size: 20px !important; height: 30px !important; }
+    .gases-contract-row td { height: 38px !important; font-size: 13.5px !important; }
+    .gases-hdr-row th { color:#000 !important; height: 26px; }
+    .gases-hdr-big { font-size: 14px !important; }
+    .gases-hdr-month { font-size: 12.5px !important; min-width: 70px !important; }
+    table.gases-table tbody tr { height: var(--grh,24px); }
+    .gases-id-cell { background: var(--or) !important; color:#000 !important; font-weight: normal !important; font-size: var(--gfs,12.5px) !important; }
+    .gases-val-cell { background:#fff; }
+    .gases-val-cell.shaded { background: var(--or-l); }
+    .gases-val-cell.has { background: var(--or) !important; }
+    .gases-val-cell input { height: var(--grh,24px) !important; min-width: 60px !important; font-size: var(--gfs,12.5px) !important; padding: 0 4px !important; }
+    .gases-row-tot { background: var(--or) !important; font-weight: normal !important; }
+    .acc { display:flex; justify-content:space-between; gap:6px; }
+    .gases-footer-row td { font-size: var(--gfs,12.5px) !important; }
+    .gases-footer-row td.grand-tot { background: var(--or-d) !important; }
+    tr.spacer td { border: none !important; height: 12px; padding: 0 !important; background:#fff !important; }
+    table.consumo-table tr.grp-tot td { background: var(--gray-tot1); font-weight: bold; }
+    table.consumo-table tr.grp-tot td.yel-tot { background: var(--gray-tot2); text-align:right; }
   </style>
 </head>
 <body>
@@ -416,9 +443,12 @@
   <!-- BARRA SUPERIOR -->
   <div class="topbar">
     <div>
-      <h1>CONTROLE DE CONSUMO & GASES 2026 · FIOCRUZ MINAS (IRR)</h1>
+      <h1>CONTROLE DE CONSUMO & GASES <span class="anoTxt">2026</span> · FIOCRUZ MINAS (IRR)</h1>
     </div>
     <div class="status-pill">
+      <span>Ano: <select id="selAno" onchange="trocarAno(this.value)"></select>
+        <button class="btn btn-mini" title="Adicionar outro ano" onclick="novoAno()">+</button></span>
+      <span>|</span>
       <span>Período Tesouro: <strong id="lblPeriodoTopo">01/07/26 a 30/09/26</strong></span>
       <span>|</span>
       <span>Meses Gás no Consolidado:
@@ -443,7 +473,7 @@
   <!-- BARRA DE ABAS -->
   <div class="tabs-bar">
     <button class="tab-btn active" onclick="openTab('tabGases', this)">
-      <span class="tab-dot" style="background:#00b0f0"></span> 1. GASES_MENSAL (Principal)
+      <span class="tab-dot" style="background:#00b0f0"></span> 1. GASES_MENSAL
     </button>
     <button class="tab-btn" onclick="openTab('tabConsumo', this)">
       <span class="tab-dot" style="background:#ffc000"></span> 2. CONSUMO (Copiar p/ Sistema)
@@ -488,17 +518,17 @@
         </div>
       </div>
 
-      <div class="table-scroll">
+      <div class="table-scroll" id="wrapGases">
         <table class="gases-table" id="tblGases">
           <thead>
             <tr class="gases-title-row">
-              <td colspan="16">GASES 2026</td>
+              <td colspan="16">GASES <span class="anoTxt">2026</span></td>
             </tr>
             <tr class="gases-contract-row">
               <td colspan="3"></td>
-              <td colspan="9">INÍCIO: 22/08/2025 - PROC. 25381.000476/2025 25381.000475/2025-56</td>
-              <td>476/2025 760/2026</td>
-              <td colspan="2">25381.000760/2026-58 AIR LIQUIDE</td>
+              <td colspan="9" id="tdContr1">INÍCIO: 22/08/2025 - PROC. 25381.000476/2025 25381.000475/2025-56</td>
+              <td id="tdContr2">476/2025 760/2026</td>
+              <td colspan="2" id="tdContr3">25381.000760/2026-58 AIR LIQUIDE</td>
               <td></td>
             </tr>
             <tr class="gases-hdr-row" id="gasesHeaderMonths">
@@ -537,10 +567,6 @@
           <label style="display:flex;align-items:center;gap:4px;cursor:pointer;">
             <input type="checkbox" id="chkApenasComValor" onchange="renderConsumo()" /> Mostrar apenas unidades com valor > 0
           </label>
-        </div>
-        <div class="toolbar-group">
-          <button class="btn btn-yellow" onclick="copiarValoresConsumo()">📋 Copiar Valores p/ Outro Sistema (Sem Fórmulas)</button>
-          <button class="btn" onclick="copiarApenasColunasEF()">📋 Copiar Só Colunas CONSUMO e GAS</button>
         </div>
       </div>
 
@@ -678,7 +704,7 @@
           <canvas id="chartGrupos" height="140"></canvas>
         </div>
         <div class="card-box">
-          <h3>Evolução Mensal de Gases em 2026 (Total do Ano)</h3>
+          <h3>Evolução Mensal de Gases em <span class="anoTxt">2026</span> (Total do Ano)</h3>
           <canvas id="chartGasesMensal" height="140"></canvas>
         </div>
       </div>
@@ -692,7 +718,7 @@
     // =========================================================================
     // 1. URL DO SEU GOOGLE APPS SCRIPT JÁ CONFIGURADA
     // =========================================================================
-    const GOOGLE_SCRIPT_URL = "https://script.google.com/macros/s/AKfycbz2S8nwI8s9rEvhxJS46pNcTBpi4rXzKp8Gx7Oso_EW-qk1BStqlR655IAvFDLjzOUA4w/exec";
+    let GOOGLE_SCRIPT_URL = "https://script.google.com/macros/s/AKfycbz2S8nwI8s9rEvhxJS46pNcTBpi4rXzKp8Gx7Oso_EW-qk1BStqlR655IAvFDLjzOUA4w/exec";
 
     // =========================================================================
     // 2. DADOS INICIAIS CARREGADOS DA SUA PLANILHA DE 2026
@@ -907,6 +933,7 @@
       document.getElementById(tabId).classList.add('active');
       if (btn) btn.classList.add('active');
       if (tabId === 'tabPainel') renderCharts();
+      if (tabId === 'tabGases') setTimeout(ajustarAlturaGases, 0);
     }
     function findUnidade(cod) {
       return UNIDADES.find(u => u.c === String(cod).trim().padStart(9, '0')) || { g: '', c: cod, s: '', d: 'NÃO CADASTRADO' };
@@ -958,16 +985,16 @@
           const val = Number(row.m[m]) || 0;
           somaLinha += val;
           totMes[m] += val;
-          const shaded = m < 7 ? 'shaded' : '';
+          const shaded = (m + 1 <= mFim) ? 'shaded' : '';
           html += `
-            <td class="gases-val-cell ${shaded}">
+            <td class="gases-val-cell ${shaded} ${val !== 0 ? 'has' : ''}">
               <input type="number" step="0.01" value="${val !== 0 ? val : ''}" placeholder="-"
                 onchange="atualizarCelulaGas(${rIdx}, ${m}, this.value)" />
             </td>
           `;
         }
         grandTotal += somaLinha;
-        html += `<td class="gases-row-tot">${fmtCurr(somaLinha)}</td>`;
+        html += `<td class="gases-row-tot">${fmtAcc(somaLinha)}</td>`;
         tr.innerHTML = html;
         tbody.appendChild(tr);
       });
@@ -975,10 +1002,11 @@
       const tfoot = document.getElementById('tfootGases');
       let footHtml = `<tr class="gases-footer-row"><td colspan="3" class="tot-label">TOTAL GERAL</td>`;
       for (let m = 0; m < 12; m++) {
-        footHtml += `<td>${fmtCurr(totMes[m])}</td>`;
+        footHtml += `<td>${fmtAcc(totMes[m])}</td>`;
       }
-      footHtml += `<td class="grand-tot">${fmtCurr(grandTotal)}</td></tr>`;
+      footHtml += `<td class="grand-tot">${fmtAcc(grandTotal)}</td></tr>`;
       tfoot.innerHTML = footHtml;
+      ajustarAlturaGases();
     }
 
     function atualizarCelulaGas(rIdx, mIdx, novoValor) {
@@ -991,6 +1019,7 @@
       const rIdx = parseInt(document.getElementById('quickGasesUnidade').value, 10);
       const mIdx = parseInt(document.getElementById('quickGasesMes').value, 10);
       const val = parseFloat(document.getElementById('quickGasesValor').value) || 0;
+      if (!gasesData[rIdx]) { showToast("Nenhuma unidade selecionada."); return; }
       gasesData[rIdx].m[mIdx] = val;
       document.getElementById('quickGasesValor').value = '';
       recalcAll();
@@ -1055,39 +1084,47 @@
       const tbody = document.getElementById('tbodyConsumo');
       tbody.innerHTML = '';
 
+      const grupos = [], mapG = {};
       linhas.forEach(l => {
-        if (apenasComValor && l.tot === 0) return;
-        if (termo && !(`${l.g} ${l.s} ${l.c} ${l.d}`).toLowerCase().includes(termo)) return;
-
-        const tr = document.createElement('tr');
-        tr.innerHTML = `
-          <td class="center">${l.g}</td>
-          <td class="center">${l.s}</td>
-          <td class="center">${l.c}</td>
-          <td>${l.d}</td>
-          <td class="yel">${l.cons !== 0 ? fmtNum(l.cons) : '-'}</td>
-          <td class="yel">${l.gas !== 0 ? fmtNum(l.gas) : '-'}</td>
-          <td class="num">${l.tot !== 0 ? fmtNum(l.tot) : '-'}</td>
-          <td class="center">${l.pct.toFixed(1).replace('.', ',')}%</td>
-        `;
-        tbody.appendChild(tr);
+        if (!mapG[l.g]) { mapG[l.g] = { L: [], c: 0, s: 0 }; grupos.push(mapG[l.g]); }
+        const G = mapG[l.g]; G.L.push(l); G.c += l.cons; G.s += l.gas;
       });
-    }
-
-    function copiarValoresConsumo() {
-      const { linhas } = calcularConsolidado();
-      const txt = linhas
-        .map(l => `${l.g}\t${l.s}\t${l.c}\t${l.d}\t${fmtNum(l.cons)}\t${fmtNum(l.gas)}\t${fmtNum(l.tot)}\t${l.pct.toFixed(1).replace('.', ',')}%`)
-        .join('\n');
-      navigator.clipboard.writeText(txt);
-      showToast("Tabela completa copiada (apenas valores, sem fórmulas)!");
-    }
-
-    function copiarApenasColunasEF() {
-      const { linhas } = calcularConsolidado();
-      const txt = linhas.map(l => `${fmtNum(l.cons)}\t${fmtNum(l.gas)}`).join('\n');
-      navigator.clipboard.writeText(txt);
-      showToast("Colunas CONSUMO e GAS copiadas prontas para colar!");
+      const pf = v => v.toFixed(1).replace('.', ',') + '%';
+      grupos.forEach(G => {
+        const gt = G.c + G.s; let vis = 0;
+        G.L.forEach(l => {
+          if (apenasComValor && l.tot === 0) return;
+          if (termo && !(`${l.g} ${l.s} ${l.c} ${l.d}`).toLowerCase().includes(termo)) return;
+          vis++;
+          const tr = document.createElement('tr');
+          tr.innerHTML = `
+            <td class="center">${l.g}</td>
+            <td class="center">${l.s}</td>
+            <td class="center">${l.c}</td>
+            <td>${l.d}</td>
+            <td class="yel">${l.cons !== 0 ? fmtNum(l.cons) : '-'}</td>
+            <td class="yel">${l.gas !== 0 ? fmtNum(l.gas) : '-'}</td>
+            <td class="num">${l.tot !== 0 ? fmtNum(l.tot) : '-'}</td>
+            <td class="center">${pf(gt > 0 ? l.tot / gt * 100 : 0)}</td>
+          `;
+          tbody.appendChild(tr);
+        });
+        if (!vis) return;
+        const tt = document.createElement('tr');
+        tt.className = 'grp-tot';
+        tt.innerHTML = `
+          <td></td><td></td><td></td><td>TOTAL</td>
+          <td class="yel-tot">${fmtNum(G.c)}</td>
+          <td class="yel-tot">${fmtNum(G.s)}</td>
+          <td class="num">${fmtNum(gt)}</td>
+          <td class="center">${gt > 0 ? '100%' : '-'}</td>
+        `;
+        tbody.appendChild(tt);
+        const sp = document.createElement('tr');
+        sp.className = 'spacer';
+        sp.innerHTML = '<td colspan="8"></td>';
+        tbody.appendChild(sp);
+      });
     }
 
     // =========================================================================
@@ -1131,14 +1168,7 @@
 
         // Extrair período em B6 (linha índice 5, coluna índice 1)
         const periodoLido = (rows[5] && rows[5][1]) ? String(rows[5][1]).trim() : '';
-        if (periodoLido) {
-          document.getElementById('lblPeriodoTopo').textContent = periodoLido;
-          document.getElementById('lblPeriodoConsumo').textContent = periodoLido;
-          const m1 = parseInt(periodoLido.substring(3, 5), 10);
-          const m2 = parseInt(periodoLido.substring(14, 16), 10);
-          if (m1 >= 1 && m1 <= 12) document.getElementById('selMesIni').value = m1;
-          if (m2 >= 1 && m2 <= 12) document.getElementById('selMesFim').value = m2;
-        }
+        if (periodoLido) aplicarPeriodo(periodoLido);
 
         const novosDados = []; let totalRel = null;
         for (let i = 8; i < rows.length; i++) {
@@ -1307,12 +1337,9 @@
         const res = await fetch(GOOGLE_SCRIPT_URL);
         const data = await res.json();
         if (data && data.ok) {
-          if (data.gases && data.gases.length) gasesData = data.gases;
+          if (data.gases && data.gases.length) { gasesData = data.gases; popularSelectRapidoGases(); }
           if (data.tesouro && data.tesouro.length) tesouroData = data.tesouro;
-          if (data.periodo) {
-            document.getElementById('lblPeriodoTopo').textContent = data.periodo;
-            document.getElementById('lblPeriodoConsumo').textContent = data.periodo;
-          }
+          if (data.periodo) aplicarPeriodo(data.periodo);
           if (data.consumo) consumoPlanilha = data.consumo;
           if (data.totalRelatorio != null) totalRelatorio = Number(data.totalRelatorio) || 0;
           syncErro = false;
@@ -1408,6 +1435,8 @@
       }
       if (consumoPlanilha && (Math.abs(consumoPlanilha.cons-totConsumo) > 0.01 || Math.abs(consumoPlanilha.gas-totGas) > 0.01))
         A.push({n:'erro', t:'Aba CONSUMO da planilha diverge do sistema', d:`Planilha: consumo R$ ${fmtNum(consumoPlanilha.cons)} / gás R$ ${fmtNum(consumoPlanilha.gas)}. Sistema: R$ ${fmtNum(totConsumo)} / R$ ${fmtNum(totGas)}. Aguarde o recálculo ou recarregue.`});
+      const per = parsePeriodo(document.getElementById('lblPeriodoTopo').textContent);
+      if (per && (per.m1 !== mIni || per.m2 !== mFim)) A.push({n:'aviso', t:'Meses de gás diferem do período do relatório', d:`Relatório do Tesouro: ${nm[per.m1-1]} a ${nm[per.m2-1]}. Meses de gás selecionados: ${nm[mIni-1]} a ${nm[mFim-1]}.`});
       return A;
     }
     function renderAlertas() {
@@ -1444,10 +1473,88 @@
       renderPainel();
     }
 
+    // ---------- Período automático (vem do relatório do Tesouro, célula B6) ----------
+    function parsePeriodo(p) {
+      const m = String(p || '').match(/(\d{2})\/(\d{2})\/(\d{2,4})\D+(\d{2})\/(\d{2})\/(\d{2,4})/);
+      return m ? { m1: +m[2], m2: +m[5] } : null;
+    }
+    function aplicarPeriodo(p) {
+      document.getElementById('lblPeriodoTopo').textContent = p;
+      document.getElementById('lblPeriodoConsumo').textContent = p;
+      const q = parsePeriodo(p);
+      if (q && q.m1 >= 1 && q.m1 <= 12 && q.m2 >= 1 && q.m2 <= 12) {
+        document.getElementById('selMesIni').value = q.m1;
+        document.getElementById('selMesFim').value = q.m2;
+      }
+    }
+
+    // ---------- Formato contábil (R$ à esquerda, valor à direita) ----------
+    function fmtAcc(v) {
+      const n = Number(v) || 0;
+      return '<div class="acc"><span>R$</span><span>' + (n === 0 ? '-' : fmtNum(n)) + '</span></div>';
+    }
+
+    // ---------- Ajusta a altura das linhas para a tabela caber sem barra lateral ----------
+    function ajustarAlturaGases() {
+      const wrap = document.getElementById('wrapGases');
+      if (!wrap || !wrap.offsetParent) return;
+      const tbl = document.getElementById('tblGases'), tb = document.getElementById('tbodyGases');
+      const n = tb.querySelectorAll('tr').length || 1, st = document.documentElement.style;
+      st.setProperty('--grh', '24px'); st.setProperty('--gfs', '12.5px'); wrap.style.maxHeight = 'none';
+      const avail = window.innerHeight - (wrap.getBoundingClientRect().top + window.scrollY) - 20;
+      const fixo = tbl.offsetHeight - tb.offsetHeight;
+      let h = Math.floor((avail - fixo) / n) - 1;
+      h = Math.max(20, Math.min(30, h));            // mínimo 20px: abaixo disso prefere rolar
+      st.setProperty('--grh', h + 'px');
+      st.setProperty('--gfs', Math.max(11.5, Math.min(13.5, h * 0.52)) + 'px');
+      wrap.style.maxHeight = Math.max(avail, 220) + 'px';
+    }
+    window.addEventListener('resize', ajustarAlturaGases);
+
+    // ---------- Anos ----------
+    // Cada ano usa uma planilha Google própria (copie a planilha, implante o Apps Script e cole a URL /exec).
+    // Pode adicionar aqui no código ou pelo botão "+" ao lado do ano.
+    const ANOS = { 2026: GOOGLE_SCRIPT_URL /*, 2025: "https://script.google.com/macros/s/.../exec" */ };
+    try { Object.assign(ANOS, JSON.parse(localStorage.getItem('anosExtras') || '{}')); } catch (e) {}
+    let ANO_ATUAL = 2026;
+    try { const a = parseInt(localStorage.getItem('anoAtual'), 10); if (a && ANOS[a] !== undefined) ANO_ATUAL = a; } catch (e) {}
+    const GASES_INI = JSON.parse(JSON.stringify(gasesData)), TESOURO_INI = JSON.parse(JSON.stringify(tesouroData));
+    const CONTRATO_2026 = ['INÍCIO: 22/08/2025 - PROC. 25381.000476/2025 25381.000475/2025-56', '476/2025 760/2026', '25381.000760/2026-58 AIR LIQUIDE'];
+
+    function popularAnos() {
+      const sel = document.getElementById('selAno');
+      sel.innerHTML = Object.keys(ANOS).sort((a, b) => b - a).map(a => `<option value="${a}">${a}</option>`).join('');
+      sel.value = ANO_ATUAL;
+    }
+    function novoAno() {
+      const a = parseInt(prompt('Qual ano deseja adicionar? (ex.: 2025)'), 10);
+      if (!a || a < 2000 || a > 2100) return;
+      const u = (prompt('Cole a URL do Apps Script (/exec) da planilha de ' + a + '.\nDeixe vazio para abrir sem planilha conectada.') || '').trim();
+      ANOS[a] = u;
+      try { const ex = JSON.parse(localStorage.getItem('anosExtras') || '{}'); ex[a] = u; localStorage.setItem('anosExtras', JSON.stringify(ex)); } catch (e) {}
+      popularAnos(); trocarAno(a);
+    }
+    function trocarAno(a) {
+      a = parseInt(a, 10); ANO_ATUAL = a; GOOGLE_SCRIPT_URL = ANOS[a] || '';
+      try { localStorage.setItem('anoAtual', a); } catch (e) {}
+      const base = (a === 2026);
+      gasesData = base ? JSON.parse(JSON.stringify(GASES_INI)) : [];
+      tesouroData = base ? JSON.parse(JSON.stringify(TESOURO_INI)) : [];
+      totalRelatorio = null; consumoPlanilha = null; syncErro = false;
+      document.querySelectorAll('.anoTxt').forEach(e => e.textContent = a);
+      document.title = `Controle de Consumo & Gases ${a} — Fiocruz Minas`;
+      const c = base ? CONTRATO_2026 : ['', '', ''];
+      ['tdContr1', 'tdContr2', 'tdContr3'].forEach((id, i) => document.getElementById(id).textContent = c[i]);
+      aplicarPeriodo(base ? '01/07/26 a 30/09/26' : '—');
+      popularSelectRapidoGases(); recalcAll();
+      const badge = document.getElementById('badgeSync');
+      if (GOOGLE_SCRIPT_URL) sincronizarDoGoogleSheets();
+      else { badge.className = 'badge-warn'; badge.textContent = 'SEM PLANILHA GOOGLE PARA ' + a; }
+    }
+
     window.addEventListener('DOMContentLoaded', () => {
-      popularSelectRapidoGases();
-      recalcAll();
-      sincronizarDoGoogleSheets();
+      popularAnos();
+      trocarAno(ANO_ATUAL);
     });
   </script>
 </body>
