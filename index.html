@@ -1,0 +1,1330 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Controle de Consumo & Gases 2026 — Fiocruz Minas</title>
+  <!-- Bibliotecas para Gráficos (Chart.js) e Leitura de Excel (SheetJS) -->
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
+  <style>
+    :root {
+      --navy: #1f3a5f;
+      --teal: #1b998b;
+      --blue-gas: #00b0f0;
+      --gray-hdr: #808080;
+      --olive: #c4d79b;
+      --olive-light: #ebf1de;
+      --green-tot: #92d050;
+      --yellow-cons: #ffc000;
+      --gray-tot1: #d9d9d9;
+      --gray-tot2: #bfbfbf;
+    }
+    * { box-sizing: border-box; font-family: Calibri, 'Segoe UI', Arial, sans-serif; }
+    body { margin: 0; background: #f0f3f8; color: #111; }
+
+    /* Barra Superior do Sistema */
+    .topbar {
+      background: var(--navy);
+      color: #fff;
+      padding: 10px 20px;
+      display: flex;
+      flex-wrap: wrap;
+      align-items: center;
+      justify-content: space-between;
+      gap: 12px;
+      box-shadow: 0 2px 6px rgba(0,0,0,0.18);
+    }
+    .topbar h1 { margin: 0; font-size: 18px; letter-spacing: 0.3px; }
+    .topbar .status-pill {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      font-size: 13px;
+      background: rgba(255,255,255,0.12);
+      padding: 5px 12px;
+      border-radius: 20px;
+    }
+    .badge-ok { background: #2e8b57; color: #fff; padding: 3px 8px; border-radius: 12px; font-weight: bold; font-size: 11px; }
+    .badge-warn { background: #d97706; color: #fff; padding: 3px 8px; border-radius: 12px; font-weight: bold; font-size: 11px; }
+
+    /* Navegação estilo Abas do Excel */
+    .tabs-bar {
+      background: #dee4ed;
+      padding: 8px 20px 0;
+      display: flex;
+      gap: 6px;
+      border-bottom: 2px solid var(--navy);
+      overflow-x: auto;
+    }
+    .tab-btn {
+      border: 1px solid #b5c0d0;
+      border-bottom: none;
+      background: #e9eef5;
+      color: #333;
+      padding: 8px 16px;
+      font-size: 13px;
+      font-weight: bold;
+      cursor: pointer;
+      border-radius: 6px 6px 0 0;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      white-space: nowrap;
+    }
+    .tab-btn.active {
+      background: #fff;
+      color: var(--navy);
+      border-top: 3px solid var(--navy);
+      margin-bottom: -2px;
+      padding-bottom: 10px;
+    }
+    .tab-dot { width: 10px; height: 10px; border-radius: 50%; display: inline-block; }
+
+    /* Conteúdo das Abas */
+    .container { padding: 16px 20px 40px; max-width: 1600px; margin: 0 auto; }
+    .tab-panel { display: none; background: #fff; padding: 16px; border-radius: 0 6px 6px 6px; box-shadow: 0 2px 8px rgba(0,0,0,0.06); }
+    .tab-panel.active { display: block; }
+
+    /* Barra de ferramentas interna */
+    .toolbar {
+      display: flex;
+      flex-wrap: wrap;
+      align-items: center;
+      justify-content: space-between;
+      gap: 10px;
+      margin-bottom: 12px;
+      padding: 10px 12px;
+      background: #f8fafd;
+      border: 1px solid #e1e7f0;
+      border-radius: 6px;
+    }
+    .toolbar-group { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; font-size: 13px; }
+    .btn {
+      background: var(--navy);
+      color: #fff;
+      border: none;
+      padding: 7px 14px;
+      border-radius: 4px;
+      font-size: 13px;
+      font-weight: bold;
+      cursor: pointer;
+    }
+    .btn:hover { opacity: 0.92; }
+    .btn-teal { background: var(--teal); }
+    .btn-yellow { background: var(--yellow-cons); color: #000; }
+    .btn-green { background: #2e8b57; }
+    input[type="text"], input[type="number"], select {
+      padding: 5px 8px;
+      border: 1px solid #bbb;
+      border-radius: 4px;
+      font-size: 13px;
+    }
+
+    /* =====================================================================
+       ABA 1: ESTILO CLÁSSICO "GASTOS DE GASES POR GRUPO 2026.xlsx"
+       ===================================================================== */
+    .table-scroll { overflow-x: auto; max-width: 100%; }
+    table.gases-table {
+      width: 100%;
+      border-collapse: collapse;
+      font-family: Calibri, sans-serif;
+    }
+    table.gases-table th, table.gases-table td {
+      border: 1px solid #000;
+      padding: 3px 6px;
+      white-space: nowrap;
+    }
+    .gases-title-row td {
+      background: var(--blue-gas);
+      color: #fff;
+      font-size: 22px;
+      font-weight: bold;
+      text-align: center;
+      height: 36px;
+    }
+    .gases-contract-row td {
+      background: var(--gray-hdr);
+      color: #000;
+      font-size: 14px;
+      font-weight: bold;
+      text-align: center;
+      height: 44px;
+      white-space: normal;
+    }
+    .gases-hdr-row th {
+      background: var(--gray-hdr);
+      color: #fff;
+      font-weight: bold;
+      text-align: center;
+      height: 28px;
+    }
+    .gases-hdr-big { font-size: 16px; }
+    .gases-hdr-month { font-size: 11px; min-width: 82px; }
+    .gases-hdr-month.in-period {
+      box-shadow: inset 0 -3px 0 var(--yellow-cons);
+    }
+    .gases-id-cell {
+      background: var(--olive);
+      color: #fff;
+      font-size: 12px;
+      font-weight: bold;
+    }
+    .gases-val-cell {
+      background: #fff;
+      color: #000;
+      font-size: 11px;
+      text-align: right;
+      padding: 0 !important;
+    }
+    .gases-val-cell.shaded { background: var(--olive-light); }
+    .gases-val-cell input {
+      width: 100%;
+      border: none;
+      background: transparent;
+      text-align: right;
+      padding: 4px 5px;
+      font-size: 11px;
+      font-family: Calibri, sans-serif;
+    }
+    .gases-val-cell input:focus {
+      outline: 2px solid #0066cc;
+      background: #fff9db;
+    }
+    .gases-row-tot {
+      background: var(--olive);
+      color: #000;
+      font-size: 11px;
+      text-align: right;
+      font-weight: bold;
+    }
+    .gases-footer-row td {
+      background: var(--gray-hdr);
+      color: #000;
+      font-size: 11px;
+      font-weight: bold;
+      text-align: right;
+      height: 24px;
+    }
+    .gases-footer-row td.tot-label {
+      color: #fff;
+      font-size: 13px;
+      text-align: center;
+    }
+    .gases-footer-row td.grand-tot {
+      background: var(--green-tot);
+      color: #000;
+      font-size: 13px;
+      font-weight: bold;
+    }
+
+    /* =====================================================================
+       ABA 2: ESTILO CLÁSSICO "Consumo&Gas Anual por Unidade 2026.xlsx"
+       ===================================================================== */
+    .consumo-header-block { margin-bottom: 10px; font-family: Calibri, sans-serif; }
+    .consumo-header-block h2 {
+      color: #0000ff;
+      font-size: 16px;
+      font-weight: bold;
+      margin: 0 0 6px 0;
+    }
+    .consumo-header-block p { margin: 2px 0; font-size: 12px; color: #000; }
+    table.consumo-table {
+      width: 100%;
+      border-collapse: collapse;
+      font-family: Calibri, sans-serif;
+      font-size: 12px;
+    }
+    table.consumo-table th, table.consumo-table td {
+      border: 1px solid #000;
+      padding: 3px 6px;
+      color: #000;
+    }
+    table.consumo-table thead th {
+      background: #fff;
+      font-weight: bold;
+      text-align: center;
+      height: 28px;
+    }
+    table.consumo-table td.yel {
+      background: var(--yellow-cons);
+      text-align: right;
+    }
+    table.consumo-table td.num { text-align: right; }
+    table.consumo-table td.center { text-align: center; }
+    table.consumo-table tr.tot-row td {
+      background: var(--gray-tot1);
+      font-weight: bold;
+      font-size: 12.5px;
+    }
+    table.consumo-table tr.tot-row td.yel-tot {
+      background: var(--gray-tot2);
+      text-align: right;
+    }
+
+    /* =====================================================================
+       ABA 3: Consumoe Gas Anual (TESOURO)
+       ===================================================================== */
+    .dropzone {
+      border: 2px dashed #4c6a92;
+      background: #f4f8fc;
+      padding: 20px;
+      text-align: center;
+      border-radius: 8px;
+      margin-bottom: 14px;
+      cursor: pointer;
+    }
+    .dropzone:hover { background: #eaf2fa; }
+    table.tesouro-table {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: 12px;
+    }
+    table.tesouro-table th {
+      background: #4c6a92;
+      color: #fff;
+      padding: 6px 8px;
+      border: 1px solid #ccc;
+      text-align: left;
+    }
+    table.tesouro-table td {
+      padding: 4px 8px;
+      border: 1px solid #ddd;
+      color: #0000cc;
+    }
+
+    /* =====================================================================
+       ABA 4: PAINEL EXECUTIVO
+       ===================================================================== */
+    .kpi-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+      gap: 12px;
+      margin-bottom: 18px;
+    }
+    .kpi-card {
+      background: var(--navy);
+      color: #fff;
+      padding: 14px 16px;
+      border-radius: 6px;
+    }
+    .kpi-card.teal { background: var(--teal); }
+    .kpi-card.slate { background: #4c6a92; }
+    .kpi-card.green { background: #2e8b57; }
+    .kpi-card .lbl { font-size: 11px; text-transform: uppercase; opacity: 0.9; font-weight: bold; }
+    .kpi-card .val { font-size: 22px; font-weight: bold; margin: 6px 0 4px; }
+    .kpi-card .sub { font-size: 11px; opacity: 0.85; }
+
+    .painel-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 16px;
+      margin-bottom: 18px;
+    }
+    @media (max-width: 980px) { .painel-grid { grid-template-columns: 1fr; } }
+    .card-box {
+      border: 1px solid #dce3ee;
+      border-radius: 6px;
+      padding: 12px;
+      background: #fff;
+    }
+    .card-box h3 {
+      margin: 0 0 10px 0;
+      font-size: 14px;
+      color: var(--navy);
+      background: #e3eaf4;
+      padding: 6px 10px;
+      border-radius: 4px;
+    }
+    table.painel-table {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: 12px;
+    }
+    table.painel-table th {
+      background: var(--navy);
+      color: #fff;
+      padding: 5px 8px;
+      text-align: left;
+    }
+    table.painel-table td {
+      padding: 5px 8px;
+      border-bottom: 1px solid #eee;
+    }
+    table.painel-table tr.tot td {
+      background: var(--navy);
+      color: #fff;
+      font-weight: bold;
+    }
+
+    /* Toast de aviso */
+    #toast {
+      position: fixed;
+      bottom: 20px;
+      right: 20px;
+      background: #1f3a5f;
+      color: #fff;
+      padding: 10px 18px;
+      border-radius: 6px;
+      font-size: 13px;
+      font-weight: bold;
+      box-shadow: 0 4px 12px rgba(0,0,0,0.25);
+      display: none;
+      z-index: 9999;
+    }
+
+    @media print {
+      .topbar, .tabs-bar, .toolbar, #toast { display: none !important; }
+      .tab-panel { box-shadow: none; padding: 0; }
+    }
+  </style>
+</head>
+<body>
+
+  <!-- BARRA SUPERIOR -->
+  <div class="topbar">
+    <div>
+      <h1>CONTROLE DE CONSUMO & GASES 2026 · FIOCRUZ MINAS (IRR)</h1>
+    </div>
+    <div class="status-pill">
+      <span>Período Tesouro: <strong id="lblPeriodoTopo">01/07/26 a 30/09/26</strong></span>
+      <span>|</span>
+      <span>Meses Gás no Consolidado:
+        <select id="selMesIni" onchange="recalcAll()">
+          <option value="1">JAN</option><option value="2">FEV</option><option value="3">MAR</option>
+          <option value="4">ABR</option><option value="5">MAI</option><option value="6">JUN</option>
+          <option value="7" selected>JUL</option><option value="8">AGO</option><option value="9">SET</option>
+          <option value="10">OUT</option><option value="11">NOV</option><option value="12">DEZ</option>
+        </select>
+        a
+        <select id="selMesFim" onchange="recalcAll()">
+          <option value="1">JAN</option><option value="2">FEV</option><option value="3">MAR</option>
+          <option value="4">ABR</option><option value="5">MAI</option><option value="6">JUN</option>
+          <option value="7">JUL</option><option value="8">AGO</option><option value="9" selected>SET</option>
+          <option value="10">OUT</option><option value="11">NOV</option><option value="12">DEZ</option>
+        </select>
+      </span>
+      <span id="badgeSync" class="badge-ok">CONECTADO AO GOOGLE SHEETS</span>
+    </div>
+  </div>
+
+  <!-- BARRA DE ABAS -->
+  <div class="tabs-bar">
+    <button class="tab-btn active" onclick="openTab('tabGases', this)">
+      <span class="tab-dot" style="background:#00b0f0"></span> 1. GASES_MENSAL (Principal)
+    </button>
+    <button class="tab-btn" onclick="openTab('tabConsumo', this)">
+      <span class="tab-dot" style="background:#ffc000"></span> 2. CONSUMO (Copiar p/ Sistema)
+    </button>
+    <button class="tab-btn" onclick="openTab('tabTesouro', this)">
+      <span class="tab-dot" style="background:#e6a700"></span> 3. Consumoe Gas Anual
+    </button>
+    <button class="tab-btn" onclick="openTab('tabPainel', this)">
+      <span class="tab-dot" style="background:#1f3a5f"></span> 4. PAINEL Executivo
+    </button>
+  </div>
+
+  <div class="container">
+
+    <!-- ===================================================================
+         ABA 1: GASES_MENSAL (Idêntica à GASTOS DE GASES POR GRUPO 2026.xlsx)
+         =================================================================== -->
+    <div id="tabGases" class="tab-panel active">
+      <div class="toolbar">
+        <div class="toolbar-group">
+          <strong>Lançamento Rápido de Gás:</strong>
+          <select id="quickGasesUnidade"></select>
+          <select id="quickGasesMes">
+            <option value="0">JAN</option><option value="1">FEV</option><option value="2">MAR</option>
+            <option value="3">ABR</option><option value="4">MAI</option><option value="5">JUN</option>
+            <option value="6">JUL</option><option value="7">AGO</option><option value="8" selected>SET</option>
+            <option value="9">OUT</option><option value="10">NOV</option><option value="11">DEZ</option>
+          </select>
+          <input type="number" id="quickGasesValor" step="0.01" placeholder="Valor R$" style="width:120px" />
+          <button class="btn btn-teal" onclick="lancarGasRapido()">Lançar e Salvar</button>
+        </div>
+        <div class="toolbar-group">
+          <button class="btn btn-green" onclick="salvarGasesNoGoogleSheets(true)">Salvar Alterações na Planilha Google</button>
+        </div>
+      </div>
+
+      <div class="table-scroll">
+        <table class="gases-table" id="tblGases">
+          <thead>
+            <tr class="gases-title-row">
+              <td colspan="16">GASES 2026</td>
+            </tr>
+            <tr class="gases-contract-row">
+              <td colspan="3"></td>
+              <td colspan="9">INÍCIO: 22/08/2025 - PROC. 25381.000476/2025 25381.000475/2025-56</td>
+              <td>476/2025 760/2026</td>
+              <td colspan="2">25381.000760/2026-58 AIR LIQUIDE</td>
+              <td></td>
+            </tr>
+            <tr class="gases-hdr-row" id="gasesHeaderMonths">
+              <th class="gases-hdr-big">CÓD</th>
+              <th class="gases-hdr-big">SIGLA</th>
+              <th class="gases-hdr-big">SETOR</th>
+              <th class="gases-hdr-month">JAN</th>
+              <th class="gases-hdr-month">FEV</th>
+              <th class="gases-hdr-month">MAR</th>
+              <th class="gases-hdr-month">ABR</th>
+              <th class="gases-hdr-month">MAI</th>
+              <th class="gases-hdr-month">JUN</th>
+              <th class="gases-hdr-month">JUL</th>
+              <th class="gases-hdr-month">AGO</th>
+              <th class="gases-hdr-month">SET</th>
+              <th class="gases-hdr-month">OUT</th>
+              <th class="gases-hdr-month">NOV</th>
+              <th class="gases-hdr-month">DEZ</th>
+              <th class="gases-hdr-big">TOTAL</th>
+            </tr>
+          </thead>
+          <tbody id="tbodyGases"></tbody>
+          <tfoot id="tfootGases"></tfoot>
+        </table>
+      </div>
+    </div>
+
+    <!-- ===================================================================
+         ABA 2: CONSUMO (Idêntica à Consumo&Gas Anual por Unidade 2026.xlsx)
+         =================================================================== -->
+    <div id="tabConsumo" class="tab-panel">
+      <div class="toolbar">
+        <div class="toolbar-group">
+          <strong>Filtrar Unidade/Grupo:</strong>
+          <input type="text" id="filtroConsumo" placeholder="Digite sigla, código ou setor..." oninput="renderConsumo()" style="width:240px" />
+          <label style="display:flex;align-items:center;gap:4px;cursor:pointer;">
+            <input type="checkbox" id="chkApenasComValor" onchange="renderConsumo()" /> Mostrar apenas unidades com valor > 0
+          </label>
+        </div>
+        <div class="toolbar-group">
+          <button class="btn btn-yellow" onclick="copiarValoresConsumo()">📋 Copiar Valores p/ Outro Sistema (Sem Fórmulas)</button>
+          <button class="btn" onclick="copiarApenasColunasEF()">📋 Copiar Só Colunas CONSUMO e GAS</button>
+        </div>
+      </div>
+
+      <div class="consumo-header-block">
+        <h2>Consumo & Gases por Unidade Anual</h2>
+        <p>Fundação Oswaldo Cruz — SGA - Almoxarifado</p>
+        <p>Período: <strong id="lblPeriodoConsumo">01/07/26 a 30/09/26</strong></p>
+      </div>
+
+      <div class="table-scroll">
+        <table class="consumo-table" id="tblConsumo">
+          <thead>
+            <tr class="tot-row" id="trTotalGeralConsumo"></tr>
+            <tr>
+              <th>GRUPO</th>
+              <th>SIGLA</th>
+              <th>COD. UNIDADE</th>
+              <th>DESCRIÇÃO</th>
+              <th>CONSUMO</th>
+              <th>GAS</th>
+              <th>TOTAL</th>
+              <th>%</th>
+            </tr>
+          </thead>
+          <tbody id="tbodyConsumo"></tbody>
+        </table>
+      </div>
+    </div>
+
+    <!-- ===================================================================
+         ABA 3: Consumoe Gas Anual (Antiga TESOURO)
+         =================================================================== -->
+    <div id="tabTesouro" class="tab-panel">
+      <div class="dropzone" onclick="document.getElementById('fileInputTesouro').click()">
+        <input type="file" id="fileInputTesouro" accept=".xlsx,.xls,.xlsm,.csv" style="display:none" onchange="importarArquivoTesouro(event)" />
+        <h3 style="margin:0 0 6px 0;color:var(--navy)">📥 Clique aqui para selecionar o relatório do Tesouro Gerencial (.xlsx)</h3>
+        <p style="margin:0;font-size:13px;color:#555">
+          Importa automaticamente o arquivo "Relatório de Percentagem de Consumo das Unidades", formata os códigos com 9 dígitos e sincroniza com a Planilha Google.
+        </p>
+        <p id="lblUltimaCarga" style="margin:8px 0 0 0;font-size:12px;color:#1b998b;font-weight:bold;">
+          Última carga: MatConPUn_Jul_ago_set.xlsx (carga inicial)
+        </p>
+      </div>
+
+      <div class="table-scroll">
+        <table class="tesouro-table">
+          <thead>
+            <tr>
+              <th>Cód. Unidade</th>
+              <th>Descrição Unidade</th>
+              <th style="text-align:right">Valor Total (R$)</th>
+              <th style="text-align:right">% Consumo</th>
+            </tr>
+          </thead>
+          <tbody id="tbodyTesouro"></tbody>
+        </table>
+      </div>
+    </div>
+
+    <!-- ===================================================================
+         ABA 4: PAINEL EXECUTIVO
+         =================================================================== -->
+    <div id="tabPainel" class="tab-panel">
+      <div class="toolbar">
+        <div class="toolbar-group">
+          <strong>PAINEL DE CONSUMO & GASES · FIOCRUZ MINAS</strong>
+        </div>
+        <div class="toolbar-group">
+          <button class="btn" onclick="window.print()">🖨️ Exportar Painel p/ PDF</button>
+        </div>
+      </div>
+
+      <div class="kpi-grid">
+        <div class="kpi-card">
+          <div class="lbl">Consumo de Materiais (Tesouro)</div>
+          <div class="val" id="kpiConsumo">R$ 0,00</div>
+          <div class="sub">Relatório do Tesouro Gerencial</div>
+        </div>
+        <div class="kpi-card teal">
+          <div class="lbl">Gás no Período Selecionado</div>
+          <div class="val" id="kpiGasPeriodo">R$ 0,00</div>
+          <div class="sub" id="kpiGasSub">Meses JUL a SET</div>
+        </div>
+        <div class="kpi-card slate">
+          <div class="lbl">Total Geral (Consumo + Gás)</div>
+          <div class="val" id="kpiTotalGeral">R$ 0,00</div>
+          <div class="sub" id="kpiPctGas">Gás = 0% do total</div>
+        </div>
+        <div class="kpi-card green" id="cardStatusFechamento">
+          <div class="lbl">Status da Conferência</div>
+          <div class="val" id="kpiStatusTexto">PRONTO PARA FECHAR</div>
+          <div class="sub" id="kpiStatusSub">Diferença Tesouro × Consolidado: R$ 0,00</div>
+        </div>
+      </div>
+
+      <div class="painel-grid">
+        <div class="card-box">
+          <h3>Consumo e Gás por Grupo Institucional</h3>
+          <table class="painel-table">
+            <thead>
+              <tr>
+                <th>GRUPO</th>
+                <th>NOME</th>
+                <th style="text-align:right">Consumo</th>
+                <th style="text-align:right">Gás</th>
+                <th style="text-align:right">Total</th>
+                <th style="text-align:right">%</th>
+              </tr>
+            </thead>
+            <tbody id="tbodyPainelGrupos"></tbody>
+          </table>
+        </div>
+
+        <div class="card-box">
+          <h3>Top 10 Unidades (Consumo + Gás no Período)</h3>
+          <table class="painel-table">
+            <thead>
+              <tr>
+                <th>#</th>
+                <th>SIGLA / COD</th>
+                <th>UNIDADE</th>
+                <th style="text-align:right">Total (R$)</th>
+                <th style="text-align:right">%</th>
+              </tr>
+            </thead>
+            <tbody id="tbodyPainelTop10"></tbody>
+          </table>
+        </div>
+      </div>
+
+      <div class="painel-grid">
+        <div class="card-box">
+          <h3>Gráfico por Grupo (Consumo vs. Gás)</h3>
+          <canvas id="chartGrupos" height="140"></canvas>
+        </div>
+        <div class="card-box">
+          <h3>Evolução Mensal de Gases em 2026 (Total do Ano)</h3>
+          <canvas id="chartGasesMensal" height="140"></canvas>
+        </div>
+      </div>
+    </div>
+
+  </div>
+
+  <div id="toast"></div>
+
+  <script>
+    // =========================================================================
+    // 1. URL DO SEU GOOGLE APPS SCRIPT JÁ CONFIGURADA
+    // =========================================================================
+    const GOOGLE_SCRIPT_URL = "https://script.google.com/macros/s/AKfycbz2S8nwI8s9rEvhxJS46pNcTBpi4rXzKp8Gx7Oso_EW-qk1BStqlR655IAvFDLjzOUA4w/exec";
+
+    // =========================================================================
+    // 2. DADOS INICIAIS CARREGADOS DA SUA PLANILHA DE 2026
+    // =========================================================================
+    const NOMES_GRUPOS = {
+      "VDP": "PESQUISA",
+      "APOIO": "APOIO À PESQUISA",
+      "PLAT": "PLATAFORMAS",
+      "V&R": "VIGILÂNCIA E REFERÊNCIA",
+      "VDG": "GESTÃO",
+      "DIR": "DIRETORIA",
+      "VDE": "ENSINO",
+      "VDI": "INOVAÇÃO"
+    };
+
+    const UNIDADES = [
+      {"g": "DIR", "c": "031001000", "s": "SECEX", "d": "SECRETARIA EXECUTIVA"},
+      {"g": "DIR", "c": "031032000", "s": "MEMO", "d": "MEMORIAS"},
+      {"g": "DIR", "c": "031020000", "s": "", "d": "POSTO AVAN. ESTUDO EMANUEL DIAS"},
+      {"g": "VDG", "c": "031002300", "s": "SINFE", "d": "SERVICO DE INFRAESTRUTURA"},
+      {"g": "VDG", "c": "031002500", "s": "SECAD", "d": "SECRETARIA ADMINISTRATIVA"},
+      {"g": "VDG", "c": "031002410", "s": "SEALM", "d": "SECAO DE ALMOXARIFADO"},
+      {"g": "VDG", "c": "031000020", "s": "SQBA", "d": "SERV GESTAO DA QUAL. BIOSSEG. E AMBIENTE"},
+      {"g": "VDG", "c": "031002330", "s": "SECOND", "d": "SECAO DE CONDOMINIO"},
+      {"g": "VDG", "c": "031000022", "s": "NUST", "d": "NUCLEO DE SAUDE DO TRABALHADOR"},
+      {"g": "VDG", "c": "031002420", "s": "NUPAT", "d": "NUCLEO DE PATRIMONIO"},
+      {"g": "VDG", "c": "031002100", "s": "SGP", "d": "SERVIÇO DE GESTAO DE PESSOAS"},
+      {"g": "VDG", "c": "031000009", "s": "VDGDI", "d": "VICE-DIRETORIA DE GESTAO INSTITUCIONAL"},
+      {"g": "VDG", "c": "031002510", "s": "ARCE", "d": "ARQUIVO CENTRAL"},
+      {"g": "VDG", "c": "031002600", "s": "SINFO", "d": "SERVICO DE INFORMATICA"},
+      {"g": "VDG", "c": "031002400", "s": "SAM", "d": "SERVICO DE ADMINISTRACAO MATERIAL"},
+      {"g": "VDG", "c": "031002310", "s": "SECON", "d": "SERVICO DE CONTRATOS"},
+      {"g": "VDE", "c": "031023010", "s": "SENS", "d": "SECRETARIA DE ENSINO"},
+      {"g": "VDE", "c": "031050000", "s": "VDE", "d": "VICE-DIR. DE ENSINO, INF. E COMUNICACAO"},
+      {"g": "VDE", "c": "031001010", "s": "NUCOM", "d": "NUCLEO DE COMUNICACAO"},
+      {"g": "VDE", "c": "031005020", "s": "DCE", "d": "COORD. DOS PROG. DE DIV. CIENT. E DE EXT"},
+      {"g": "VDE", "c": "031050020", "s": "DCE", "d": "COORD. DE DIV. CIENT. E EXT."},
+      {"g": "VDE", "c": "031003000", "s": "BIBLIOT", "d": "NUCLEO DE BIBLIOTECA"},
+      {"g": "VDI", "c": "031000060", "s": "SAPRO", "d": "SERVICO DE APOIO A PROJETOS E COOPERACAO"},
+      {"g": "VDI", "c": "031040000", "s": "VDP", "d": "VICE-DIR. DE PESQ, INOV. TEC. E SERV. RE"},
+      {"g": "APOIO", "c": "031006010", "s": "BIOT", "d": "SECAO DE BIOTERIO"},
+      {"g": "APOIO", "c": "031000023", "s": "NC", "d": "NUCLEO DE CRIOPRESERVACAO"},
+      {"g": "APOIO", "c": "031040700", "s": "LMP", "d": "LAB MULTIUS. DE CULTIVO DE PARASITOS"},
+      {"g": "APOIO", "c": "031040800", "s": "LMC", "d": "LAB. MULTI. DE CULT. DE CEL. PRIM."},
+      {"g": "APOIO", "c": "031000021", "s": "NE", "d": "NUCLEO DE ESTERILIZACAO"},
+      {"g": "APOIO", "c": "031040250", "s": "PROREC", "d": "LAB. MULT. DE PRODUCAO DE RECOMBINANTES"},
+      {"g": "APOIO", "c": "031024000", "s": "MOLUS", "d": "SECAO DE MOLUSCARIO"},
+      {"g": "APOIO", "c": "031041100", "s": "NAST", "d": "NUCLEO DE APOIO SECRETARIAL E TECNICO"},
+      {"g": "APOIO", "c": "031040150", "s": "SAP", "d": "SERVICO DE APOIO A PESQUISA"},
+      {"g": "APOIO", "c": "031040151", "s": "", "d": "SECAO DE INSETARIO"},
+      {"g": "APOIO", "c": "031041200", "s": "BIOBANCO", "d": "BIOBANCO"},
+      {"g": "PLAT", "c": "031040190", "s": "RPT08D", "d": "PLATAFORMA DE CITOMETRIA DE FLUXO"},
+      {"g": "PLAT", "c": "031040400", "s": "SANGER", "d": "PLAT. DE SEQUENCIAMENTO CAPILAR (SANGER)"},
+      {"g": "PLAT", "c": "031040200", "s": "RPT09D", "d": "PLATAFORMA PCR EM TEMPO REAL BH"},
+      {"g": "PLAT", "c": "031040240", "s": "CONFOCAL", "d": "MICROSCOPIA DE FLUORESCENCIA E CONFOCAL"},
+      {"g": "PLAT", "c": "031040360", "s": "RPT18A", "d": "IMPRESSÃO 3D"},
+      {"g": "PLAT", "c": "031040900", "s": "", "d": "PLATAFORMA DE PROTEINAS RECOMBINANTES"},
+      {"g": "PLAT", "c": "031040350", "s": "RPT01F", "d": "PLATAFORMA DE SEQUENCIAMENTO NGS"},
+      {"g": "PLAT", "c": "031040241", "s": "RPT07E", "d": "MICROSCOPIA E MICROANALISE DE IM."},
+      {"g": "V&R", "c": "031040010", "s": "CRL", "d": "CENTRO DE REFERENCIA EM LEISHMANIOSES"},
+      {"g": "V&R", "c": "031012000", "s": "HMM", "d": "HELMINTOLOGIA E MALACOLOGIA MEDICA"},
+      {"g": "V&R", "c": "031040030", "s": "", "d": "LAB. DE REFERENCIA EM DOENCA DE CHAGAS"},
+      {"g": "V&R", "c": "031040040", "s": "LESQ", "d": "LAB. DE REF. EM DIAG. DE ESQUISTOSSOMOSE"},
+      {"g": "V&R", "c": "031030000", "s": "CMN", "d": "COLECAO DE MOSQUITOS NEOTROPICAIS"},
+      {"g": "V&R", "c": "031037000", "s": "CVT", "d": "COLECAO DE VETORES DE TRIPANOSOMATÍDEOS"},
+      {"g": "V&R", "c": "031040020", "s": "", "d": "LAB. DE REFERENCIA EM ESQUISTOSSOMOSE"},
+      {"g": "VDP", "c": "031040110", "s": "IP", "d": "IMUNOPATOLOGIA"},
+      {"g": "VDP", "c": "031040120", "s": "GFP", "d": "GENOMICA FUNCIONAL DE PARASITOS"},
+      {"g": "VDP", "c": "031013000", "s": "ICM", "d": "IMUNOLOGIA CELULAR E MOLECULAR"},
+      {"g": "VDP", "c": "031008000", "s": "GIPB", "d": "GRUPO INTEGR. DE PESQ. EM BIOMARCADORES"},
+      {"g": "VDP", "c": "031040310", "s": "BAP", "d": "BIOTEC. APLICADA AO ESTUDO DE PATOGENOS"},
+      {"g": "VDP", "c": "031014000", "s": "GEL", "d": "GRUPO DE ESTUDO EM LEISHMANIOSES"},
+      {"g": "VDP", "c": "031021000", "s": "IDV", "d": "IMUNOLOGIA DE DOENCAS VIRAIS"},
+      {"g": "VDP", "c": "031040130", "s": "MV", "d": "MOSQUITOS VETORES: ENDOS. E INT. PATOGEN"},
+      {"g": "VDP", "c": "031040140", "s": "IB", "d": "INFORMATICA DE BIOSSISTEMAS"},
+      {"g": "VDP", "c": "031016000", "s": "BMIM", "d": "BIOLOGIA MOLECULAR E IMUNOL. DA MALARIA"},
+      {"g": "VDP", "c": "031040070", "s": "TFL", "d": "TAXONOMIA DE FLEB. EP. DIAG. E CONT. LEI"},
+      {"g": "VDP", "c": "031040090", "s": "CVIP", "d": "COMPORT. DE VETORES E INT. COM PATOGENOS"},
+      {"g": "VDP", "c": "031010000", "s": "TRIATO", "d": "TRIATOMINEOS"},
+      {"g": "VDP", "c": "031019000", "s": "PCPP", "d": "PESQ. CLIN. E POL. PUB. EM DOENCAS INFE"},
+      {"g": "VDP", "c": "031040290", "s": "BIP", "d": "BIOLOGIA E IMUN. DE DOENCAS INF. PARASITARIA"},
+      {"g": "VDP", "c": "031007000", "s": "EM", "d": "ENTOMOLOGIA MEDICA"},
+      {"g": "VDP", "c": "031018000", "s": "QPNB", "d": "QUIMICA DE PRODUTOS NATURAIS BIOATIVOS"},
+      {"g": "VDP", "c": "031009000", "s": "DATA", "d": "DIAGNÓSTICO E TER. DE DOENÇAS INF. E ONC"},
+      {"g": "VDP", "c": "031011000", "s": "NESPE", "d": "NUCLEO DE EST. EM SAUDE PUB. E ENVELHECI"},
+      {"g": "VDP", "c": "031040280", "s": "PPDH", "d": "POL. PUB. E D. HUM. EM SAUDE E SANEAMENT"},
+      {"g": "VDP", "c": "031040340", "s": "VGS", "d": "VIOLÊNCIAS, GÊNERO E SAÚDE"},
+      {"g": "VDP", "c": "031023000", "s": "GETESA", "d": "GRUPO DE EST. TRANS, EM TEC. EM SAUDE"},
+      {"g": "VDP", "c": "031040330", "s": "SEC", "d": "SAÚDE, EDUCAÇÃO E CIDADANIA"},
+      {"g": "VDP", "c": "031040320", "s": "PSPS", "d": "POLÍTICAS DE SAÚDE E PROTEÇÃO SOCIAL"},
+      {"g": "VDP", "c": "031040260", "s": "CEP", "d": "COMITE DE ETICA EM PESQUISA"},
+      {"g": "VDP", "c": "031040060", "s": "MEH", "d": "MALARIA EXPERIMENTAL E HUMANA"}
+    ];
+
+    let gasesData = [
+      {"c": "031000021", "m": [31718.85, 35948.03, 46520.98, 44406.39, 42291.8, 61323.11, 50750.16, 63437.7, 63437.7, 50117.44, 0, 0]},
+      {"c": "031002300", "m": [0, 0, 0, 0, 0, 176.96, 327.96, 0, 0, 0, 0, 0]},
+      {"c": "031002410", "m": [0, 0, 356.04, 0, 0, 178.02, 178.02, 0, 515.6, 0, 0, 0]},
+      {"c": "031006010", "m": [0, 0, 0, 0, 178.02, 0, 0, 0, 0, 0, 0, 0]},
+      {"c": "031007000", "m": [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]},
+      {"c": "031008000", "m": [0, 0, 0, 0, 178.02, 178.02, 0, 178.02, 0, 178.02, 0, 0]},
+      {"c": "031009000", "m": [0, 0, 178.02, 0, 0, 178.02, 0, 0, 0, 0, 0, 0]},
+      {"c": "031012000", "m": [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]},
+      {"c": "031013000", "m": [178.02, 0, 178.02, 178.02, 178.02, 178.02, 178.02, 178.02, 178.02, 178.02, 0, 0]},
+      {"c": "031014000", "m": [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]},
+      {"c": "031016000", "m": [0, 0, 0, 0, 0, 0, 0, 0, 178.02, 0, 0, 0]},
+      {"c": "031018000", "m": [0, 0, 0, 0, 0, 0, 257.8, 0, 0, 5850.0, 0, 0]},
+      {"c": "031019000", "m": [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]},
+      {"c": "031021000", "m": [0, 0, 0, 178.02, 0, 0, 356.04, 0, 0, 0, 0, 0]},
+      {"c": "031040060", "m": [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]},
+      {"c": "031040110", "m": [0, 1235.19, 0, 178.02, 178.02, 1622.02, 178.02, 0, 356.04, 875.0, 0, 0]},
+      {"c": "031040120", "m": [0, 0, 0, 0, 178.02, 0, 0, 0, 0, 0, 0, 0]},
+      {"c": "031040130", "m": [0, 0, 0, 0, 0, 0, 0, 34.83, 69.66, 0, 0, 0]},
+      {"c": "031040140", "m": [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]},
+      {"c": "031040241", "m": [0, 0, 0, 0, 0, 0, 0, 0, 336.8, 0, 0, 0]},
+      {"c": "031040250", "m": [633.33, 0, 0, 0, 0, 633.33, 0, 633.33, 0, 0, 0, 0]},
+      {"c": "031040290", "m": [0, 633.33, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]},
+      {"c": "031040310", "m": [0, 0, 0, 0, 0, 0, 257.8, 0, 0, 0, 0, 0]},
+      {"c": "031040800", "m": [0, 0, 0, 0, 178.02, 0, 514.82, 178.02, 0, 0, 0, 0]},
+      {"c": "031040700", "m": [0, 0, 0, 178.02, 0, 178.02, 336.8, 178.02, 0, 178.02, 0, 0]}
+    ];
+
+    let tesouroData = [
+      {"c": "031000009", "d": "VICE-DIR. DE GESTAO E DESENV. INSTIT.", "v": 65.82, "p": 0.02},
+      {"c": "031000020", "d": "SERV GESTAO DA QUAL. BIOSSEG. E AMBIENTE", "v": 402.75, "p": 0.13},
+      {"c": "031000021", "d": "NUCLEO DE ESTERILIZACAO", "v": 3324.73, "p": 1.09},
+      {"c": "031000022", "d": "NUCLEO DE SAUDE DO TRABALHADOR", "v": 18.49, "p": 0.01},
+      {"c": "031000023", "d": "NUCLEO DE CRIOPRESERVACAO", "v": 729.75, "p": 0.24},
+      {"c": "031001000", "d": "SECRETARIA EXECUTIVA", "v": 543.44, "p": 0.18},
+      {"c": "031002100", "d": "SERVIÇO DE GESTAO DE PESSOAS", "v": 41.6, "p": 0.01},
+      {"c": "031002300", "d": "COORDENACAO DE INFRAESTRUTURA", "v": 3311.94, "p": 1.09},
+      {"c": "031002330", "d": "SECAO DE CONDOMINIO", "v": 73.92, "p": 0.02},
+      {"c": "031002410", "d": "SECAO DE ALMOXARIFADO", "v": 146.37, "p": 0.05},
+      {"c": "031002420", "d": "NUCLEO DE PATRIMONIO", "v": 52.87, "p": 0.02},
+      {"c": "031002500", "d": "SECRETARIA ADMINISTRATIVA", "v": 36.83, "p": 0.01},
+      {"c": "031003000", "d": "NUCLEO DE BIBLIOTECA", "v": 39.6, "p": 0.01},
+      {"c": "031006010", "d": "SECAO DE BIOTERIO", "v": 68911.84, "p": 22.59},
+      {"c": "031007000", "d": "ENTOMOLOGIA MEDICA", "v": 4467.99, "p": 1.46},
+      {"c": "031008000", "d": "GRUPO INTEGR. DE PESQ. EM BIOMARCADORES", "v": 14409.84, "p": 4.72},
+      {"c": "031009000", "d": "DIAGNÓSTICO E TER. DE DOENÇAS INF. E ONC", "v": 3632.68, "p": 1.19},
+      {"c": "031010000", "d": "TRIATOMINEOS", "v": 5616.61, "p": 1.84},
+      {"c": "031011000", "d": "NUCLEO DE EST. EM SAUDE PUB. E ENVELHECI", "v": 118.8, "p": 0.04},
+      {"c": "031012000", "d": "HELMINTOLOGIA E MALACOLOGIA MEDICA", "v": 6281.14, "p": 2.06},
+      {"c": "031013000", "d": "IMUNOLOGIA CELULAR E MOLECULAR", "v": 32837.93, "p": 10.76},
+      {"c": "031014000", "d": "GRUPO DE ESTUDO EM LEISHMANIOSES", "v": 6575.81, "p": 2.16},
+      {"c": "031016000", "d": "BIOLOGIA MOLECULAR E IMUNOL. DA MALARIA", "v": 4980.04, "p": 1.63},
+      {"c": "031018000", "d": "QUIMICA DE PRODUTOS NATURAIS BIOATIVOS", "v": 3758.77, "p": 1.23},
+      {"c": "031019000", "d": "PESQ. CLIN. E POL. PUB. EM DOENCAS INFE", "v": 4444.02, "p": 1.46},
+      {"c": "031021000", "d": "IMUNOLOGIA DE DOENCAS VIRAIS", "v": 15776.64, "p": 5.17},
+      {"c": "031023010", "d": "SERVICO DE SECRETARIA DE ENSINO", "v": 185.14, "p": 0.06},
+      {"c": "031024000", "d": "SECAO DE MOLUSCARIO", "v": 1245.8, "p": 0.41},
+      {"c": "031030000", "d": "COLECAO DE MOSQUITOS NEOTROPICAIS", "v": 47.81, "p": 0.02},
+      {"c": "031032000", "d": "MEMORIAS", "v": 50.16, "p": 0.02},
+      {"c": "031040010", "d": "CENTRO DE REFERENCIA EM LEISHMANIOSES", "v": 9456.13, "p": 3.1},
+      {"c": "031040020", "d": "LAB. DE REFERENCIA EM ESQUISTOSSOMOSE", "v": 127.36, "p": 0.04},
+      {"c": "031040030", "d": "LAB. DE REFERENCIA EM DOENCA DE CHAGAS", "v": 43.77, "p": 0.01},
+      {"c": "031040040", "d": "LAB. DE REF. EM DIAG. DE ESQUISTOSSOMOSE", "v": 1803.59, "p": 0.59},
+      {"c": "031040070", "d": "TAXONOMIA DE FLEB. EP. DIAG. E CONT. LEI", "v": 4847.89, "p": 1.59},
+      {"c": "031040090", "d": "COMPORT. DE VETORES E INT. COM PATOGENOS", "v": 2737.94, "p": 0.9},
+      {"c": "031040110", "d": "IMUNOPATOLOGIA", "v": 19245.63, "p": 6.31},
+      {"c": "031040120", "d": "GENOMICA FUNCIONAL DE PARASITOS", "v": 18677.88, "p": 6.12},
+      {"c": "031040130", "d": "MOSQUITOS VETORES: ENDOS. E INT. PATOGEN", "v": 9912.1, "p": 3.25},
+      {"c": "031040140", "d": "INFORMATICA DE BIOSSISTEMAS", "v": 4430.54, "p": 1.45},
+      {"c": "031040150", "d": "SERVICO DE APOIO A PESQUISA", "v": 19.8, "p": 0.01},
+      {"c": "031040151", "d": "SECAO DE INSETARIO", "v": 66.82, "p": 0.02},
+      {"c": "031040190", "d": "PLATAFORMA DE CITOMETRIA DE FLUXO", "v": 8378.23, "p": 2.75},
+      {"c": "031040200", "d": "PCR EM TEMPO REAL", "v": 47.62, "p": 0.02},
+      {"c": "031040241", "d": "MICROSCOPIA E MICROANALISE DE IM.", "v": 478.66, "p": 0.16},
+      {"c": "031040250", "d": "LAB. MULT. DE PRODUCAO DE RECOMBINANTES", "v": 1677.12, "p": 0.55},
+      {"c": "031040260", "d": "COMITE DE ETICA EM PESQUISA", "v": 39.6, "p": 0.01},
+      {"c": "031040280", "d": "POL. PUB. E D. HUM. EM SAUDE E SANEAMENT", "v": 120.8, "p": 0.04},
+      {"c": "031040290", "d": "BIO. E IMUN. DE DOENCAS INF. PARASITARIA", "v": 7337.02, "p": 2.4},
+      {"c": "031040310", "d": "BIOTEC. APLICADA AO ESTUDO DE PATOGENOS", "v": 17040.72, "p": 5.59},
+      {"c": "031040330", "d": "SAÚDE, EDUCAÇÃO E CIDADANIA", "v": 165.3, "p": 0.05},
+      {"c": "031040340", "d": "VIOLÊNCIAS, GÊNERO E SAÚDE", "v": 575.43, "p": 0.19},
+      {"c": "031040350", "d": "SEQUENCIAMENTO NGS", "v": 3569.48, "p": 1.17},
+      {"c": "031040360", "d": "IMPRESSÃO 3D", "v": 305.0, "p": 0.1},
+      {"c": "031040400", "d": "PLAT. DE SEQUENCIAMENTO CAPILAR (SANGER)", "v": 44.49, "p": 0.01},
+      {"c": "031040700", "d": "LAB MULTIUS. DE CULTIVO DE PARASITOS", "v": 2246.91, "p": 0.74},
+      {"c": "031040800", "d": "LAB MULTI. DE CULT. DE CEL. PRIM.", "v": 8292.49, "p": 2.72},
+      {"c": "031040900", "d": "PLATAFORMA DE PROTEINAS RECOMBINANTES", "v": 652.01, "p": 0.21},
+      {"c": "031041100", "d": "NUCLEO DE APOIO SECRETARIAL E TECNICO", "v": 562.5, "p": 0.18},
+      {"c": "031050000", "d": "VICE-DIR. DE ENSINO, INF. E COMUNICACAO", "v": 10.72, "p": 0.0},
+      {"c": "031050020", "d": "COORD. DE DIV. CIENT. E EXT.", "v": 72.03, "p": 0.02}
+    ];
+
+    let chartGruposInstance = null;
+    let chartGasesInstance = null;
+
+    // =========================================================================
+    // 3. FUNÇÕES UTILITÁRIAS E NAVEGAÇÃO
+    // =========================================================================
+    function fmtNum(v) {
+      const n = Number(v) || 0;
+      return n.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+    }
+    function fmtCurr(v) {
+      const n = Number(v) || 0;
+      if (n === 0) return 'R$ -';
+      return 'R$ ' + fmtNum(n);
+    }
+    function showToast(msg) {
+      const t = document.getElementById('toast');
+      t.textContent = msg;
+      t.style.display = 'block';
+      clearTimeout(t._timer);
+      t._timer = setTimeout(() => { t.style.display = 'none'; }, 3500);
+    }
+    function openTab(tabId, btn) {
+      document.querySelectorAll('.tab-panel').forEach(p => p.classList.remove('active'));
+      document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+      document.getElementById(tabId).classList.add('active');
+      if (btn) btn.classList.add('active');
+      if (tabId === 'tabPainel') renderCharts();
+    }
+    function findUnidade(cod) {
+      return UNIDADES.find(u => u.c === String(cod).trim().padStart(9, '0')) || { g: '', c: cod, s: '', d: 'NÃO CADASTRADO' };
+    }
+
+    // =========================================================================
+    // 4. RENDERIZAÇÃO DA ABA 1: GASES_MENSAL
+    // =========================================================================
+    function popularSelectRapidoGases() {
+      const sel = document.getElementById('quickGasesUnidade');
+      sel.innerHTML = '';
+      gasesData.forEach((row, idx) => {
+        const u = findUnidade(row.c);
+        const opt = document.createElement('option');
+        opt.value = idx;
+        opt.textContent = `${row.c} · ${u.s || 'S/S'} — ${u.d}`;
+        sel.appendChild(opt);
+      });
+    }
+
+    function renderGases() {
+      const mIni = parseInt(document.getElementById('selMesIni').value, 10);
+      const mFim = parseInt(document.getElementById('selMesFim').value, 10);
+
+      // Destacar cabeçalhos dos meses ativos no período
+      const ths = document.querySelectorAll('#gasesHeaderMonths .gases-hdr-month');
+      ths.forEach((th, i) => {
+        if (i + 1 >= mIni && i + 1 <= mFim) th.classList.add('in-period');
+        else th.classList.remove('in-period');
+      });
+
+      const tbody = document.getElementById('tbodyGases');
+      tbody.innerHTML = '';
+      const totMes = new Array(12).fill(0);
+      let grandTotal = 0;
+
+      gasesData.forEach((row, rIdx) => {
+        const u = findUnidade(row.c);
+        const tr = document.createElement('tr');
+        let somaLinha = 0;
+
+        let html = `
+          <td class="gases-id-cell" style="text-align:center">${row.c}</td>
+          <td class="gases-id-cell" style="text-align:center">${u.s}</td>
+          <td class="gases-id-cell">${u.d}</td>
+        `;
+
+        for (let m = 0; m < 12; m++) {
+          const val = Number(row.m[m]) || 0;
+          somaLinha += val;
+          totMes[m] += val;
+          const shaded = m < 7 ? 'shaded' : '';
+          html += `
+            <td class="gases-val-cell ${shaded}">
+              <input type="number" step="0.01" value="${val !== 0 ? val : ''}" placeholder="-"
+                onchange="atualizarCelulaGas(${rIdx}, ${m}, this.value)" />
+            </td>
+          `;
+        }
+        grandTotal += somaLinha;
+        html += `<td class="gases-row-tot">${fmtCurr(somaLinha)}</td>`;
+        tr.innerHTML = html;
+        tbody.appendChild(tr);
+      });
+
+      const tfoot = document.getElementById('tfootGases');
+      let footHtml = `<tr class="gases-footer-row"><td colspan="3" class="tot-label">TOTAL GERAL</td>`;
+      for (let m = 0; m < 12; m++) {
+        footHtml += `<td>${fmtCurr(totMes[m])}</td>`;
+      }
+      footHtml += `<td class="grand-tot">${fmtCurr(grandTotal)}</td></tr>`;
+      tfoot.innerHTML = footHtml;
+    }
+
+    function atualizarCelulaGas(rIdx, mIdx, novoValor) {
+      gasesData[rIdx].m[mIdx] = parseFloat(novoValor) || 0;
+      recalcAll();
+      salvarGasesNoGoogleSheets(false);
+    }
+
+    function lancarGasRapido() {
+      const rIdx = parseInt(document.getElementById('quickGasesUnidade').value, 10);
+      const mIdx = parseInt(document.getElementById('quickGasesMes').value, 10);
+      const val = parseFloat(document.getElementById('quickGasesValor').value) || 0;
+      gasesData[rIdx].m[mIdx] = val;
+      document.getElementById('quickGasesValor').value = '';
+      recalcAll();
+      salvarGasesNoGoogleSheets(true);
+    }
+
+    // =========================================================================
+    // 5. CONSOLIDAÇÃO E RENDERIZAÇÃO DA ABA 2: CONSUMO
+    // =========================================================================
+    function calcularConsolidado() {
+      const mIni = parseInt(document.getElementById('selMesIni').value, 10);
+      const mFim = parseInt(document.getElementById('selMesFim').value, 10);
+
+      const mapaTesouro = {};
+      tesouroData.forEach(t => {
+        const c = String(t.c).trim().padStart(9, '0');
+        mapaTesouro[c] = (mapaTesouro[c] || 0) + (Number(t.v) || 0);
+      });
+
+      const mapaGases = {};
+      gasesData.forEach(g => {
+        const c = String(g.c).trim().padStart(9, '0');
+        let somaPeriodo = 0;
+        for (let m = mIni - 1; m <= mFim - 1; m++) {
+          if (m >= 0 && m < 12) somaPeriodo += (Number(g.m[m]) || 0);
+        }
+        mapaGases[c] = (mapaGases[c] || 0) + somaPeriodo;
+      });
+
+      let totConsumo = 0;
+      let totGas = 0;
+      const linhas = UNIDADES.map(u => {
+        const cons = mapaTesouro[u.c] || 0;
+        const gas = mapaGases[u.c] || 0;
+        const tot = cons + gas;
+        totConsumo += cons;
+        totGas += gas;
+        return { g: u.g, s: u.s, c: u.c, d: u.d, cons, gas, tot, pct: 0 };
+      });
+
+      const totGeral = totConsumo + totGas;
+      linhas.forEach(l => {
+        l.pct = totGeral > 0 ? (l.tot / totGeral) * 100 : 0;
+      });
+
+      return { linhas, totConsumo, totGas, totGeral };
+    }
+
+    function renderConsumo() {
+      const { linhas, totConsumo, totGas, totGeral } = calcularConsolidado();
+      const termo = (document.getElementById('filtroConsumo').value || '').toLowerCase().trim();
+      const apenasComValor = document.getElementById('chkApenasComValor').checked;
+
+      document.getElementById('trTotalGeralConsumo').innerHTML = `
+        <td colspan="4" style="text-align:right">TOTAL GERAL</td>
+        <td class="yel-tot">${fmtNum(totConsumo)}</td>
+        <td class="yel-tot">${fmtNum(totGas)}</td>
+        <td class="num">${fmtNum(totGeral)}</td>
+        <td class="center">100%</td>
+      `;
+
+      const tbody = document.getElementById('tbodyConsumo');
+      tbody.innerHTML = '';
+
+      linhas.forEach(l => {
+        if (apenasComValor && l.tot === 0) return;
+        if (termo && !(`${l.g} ${l.s} ${l.c} ${l.d}`).toLowerCase().includes(termo)) return;
+
+        const tr = document.createElement('tr');
+        tr.innerHTML = `
+          <td class="center">${l.g}</td>
+          <td class="center">${l.s}</td>
+          <td class="center">${l.c}</td>
+          <td>${l.d}</td>
+          <td class="yel">${l.cons !== 0 ? fmtNum(l.cons) : '-'}</td>
+          <td class="yel">${l.gas !== 0 ? fmtNum(l.gas) : '-'}</td>
+          <td class="num">${l.tot !== 0 ? fmtNum(l.tot) : '-'}</td>
+          <td class="center">${l.pct.toFixed(1).replace('.', ',')}%</td>
+        `;
+        tbody.appendChild(tr);
+      });
+    }
+
+    function copiarValoresConsumo() {
+      const { linhas } = calcularConsolidado();
+      const txt = linhas
+        .map(l => `${l.g}\t${l.s}\t${l.c}\t${l.d}\t${fmtNum(l.cons)}\t${fmtNum(l.gas)}\t${fmtNum(l.tot)}\t${l.pct.toFixed(1).replace('.', ',')}%`)
+        .join('\n');
+      navigator.clipboard.writeText(txt);
+      showToast("Tabela completa copiada (apenas valores, sem fórmulas)!");
+    }
+
+    function copiarApenasColunasEF() {
+      const { linhas } = calcularConsolidado();
+      const txt = linhas.map(l => `${fmtNum(l.cons)}\t${fmtNum(l.gas)}`).join('\n');
+      navigator.clipboard.writeText(txt);
+      showToast("Colunas CONSUMO e GAS copiadas prontas para colar!");
+    }
+
+    // =========================================================================
+    // 6. RENDERIZAÇÃO E IMPORTAÇÃO DA ABA 3: Consumoe Gas Anual
+    // =========================================================================
+    function renderTesouro() {
+      const tbody = document.getElementById('tbodyTesouro');
+      tbody.innerHTML = '';
+      let soma = 0;
+      tesouroData.forEach(t => {
+        soma += Number(t.v) || 0;
+        const tr = document.createElement('tr');
+        tr.innerHTML = `
+          <td>${t.c}</td>
+          <td>${t.d}</td>
+          <td style="text-align:right">${fmtNum(t.v)}</td>
+          <td style="text-align:right">${fmtNum(t.p)}%</td>
+        `;
+        tbody.appendChild(tr);
+      });
+      const trTot = document.createElement('tr');
+      trTot.style.fontWeight = 'bold';
+      trTot.style.background = '#eef3f9';
+      trTot.innerHTML = `
+        <td colspan="2" style="text-align:right">Total do Relatório:</td>
+        <td style="text-align:right">R$ ${fmtNum(soma)}</td>
+        <td style="text-align:right">100,00%</td>
+      `;
+      tbody.appendChild(trTot);
+    }
+
+    function importarArquivoTesouro(event) {
+      const file = event.target.files[0];
+      if (!file) return;
+      const reader = new FileReader();
+      reader.onload = function(e) {
+        const data = new Uint8Array(e.target.result);
+        const workbook = XLSX.read(data, { type: 'array' });
+        const sheet = workbook.Sheets[workbook.SheetNames[0]];
+        const rows = XLSX.utils.sheet_to_json(sheet, { header: 1, defval: '' });
+
+        // Extrair período em B6 (linha índice 5, coluna índice 1)
+        const periodoLido = (rows[5] && rows[5][1]) ? String(rows[5][1]).trim() : '';
+        if (periodoLido) {
+          document.getElementById('lblPeriodoTopo').textContent = periodoLido;
+          document.getElementById('lblPeriodoConsumo').textContent = periodoLido;
+          const m1 = parseInt(periodoLido.substring(3, 5), 10);
+          const m2 = parseInt(periodoLido.substring(14, 16), 10);
+          if (m1 >= 1 && m1 <= 12) document.getElementById('selMesIni').value = m1;
+          if (m2 >= 1 && m2 <= 12) document.getElementById('selMesFim').value = m2;
+        }
+
+        const novosDados = [];
+        for (let i = 8; i < rows.length; i++) {
+          const r = rows[i];
+          if (!r || String(r[2]).trim() === 'Total:') break;
+          const codRaw = String(r[0] || '').trim();
+          if (codRaw && !isNaN(Number(codRaw))) {
+            novosDados.push({
+              c: codRaw.padStart(9, '0'),
+              d: String(r[1] || '').trim(),
+              v: parseFloat(r[3]) || 0,
+              p: parseFloat(r[4]) || 0
+            });
+          }
+        }
+
+        if (novosDados.length === 0) {
+          alert("Não foram encontradas linhas válidas de unidades neste arquivo.");
+          return;
+        }
+
+        tesouroData = novosDados;
+        document.getElementById('lblUltimaCarga').textContent = `Última carga: ${file.name} (${novosDados.length} unidades)`;
+        recalcAll();
+        salvarTesouroNoGoogleSheets(periodoLido);
+        showToast(`Relatório importado com sucesso: ${novosDados.length} unidades!`);
+      };
+      reader.readAsArrayBuffer(file);
+    }
+
+    // =========================================================================
+    // 7. RENDERIZAÇÃO DA ABA 4: PAINEL EXECUTIVO E GRÁFICOS
+    // =========================================================================
+    function renderPainel() {
+      const { linhas, totConsumo, totGas, totGeral } = calcularConsolidado();
+      const nomesMeses = ["JAN","FEV","MAR","ABR","MAI","JUN","JUL","AGO","SET","OUT","NOV","DEZ"];
+      const mIni = parseInt(document.getElementById('selMesIni').value, 10);
+      const mFim = parseInt(document.getElementById('selMesFim').value, 10);
+
+      document.getElementById('kpiConsumo').textContent = 'R$ ' + fmtNum(totConsumo);
+      document.getElementById('kpiGasPeriodo').textContent = 'R$ ' + fmtNum(totGas);
+      document.getElementById('kpiGasSub').textContent = `Meses ${nomesMeses[mIni-1]} a ${nomesMeses[mFim-1]}`;
+      document.getElementById('kpiTotalGeral').textContent = 'R$ ' + fmtNum(totGeral);
+      const pctGas = totGeral > 0 ? ((totGas / totGeral) * 100).toFixed(1) : '0.0';
+      document.getElementById('kpiPctGas').textContent = `Gás representa ${pctGas.replace('.', ',')}% do total`;
+
+      // Conferência Tesouro x Consolidado
+      const somaTesouroBruto = tesouroData.reduce((acc, t) => acc + (Number(t.v) || 0), 0);
+      const diff = Math.abs(somaTesouroBruto - totConsumo);
+      const cardSt = document.getElementById('cardStatusFechamento');
+      if (diff < 0.01) {
+        cardSt.style.background = '#2e8b57';
+        document.getElementById('kpiStatusTexto').textContent = 'PRONTO PARA FECHAR';
+        document.getElementById('kpiStatusSub').textContent = 'Total Tesouro confere 100% com o consolidado';
+      } else {
+        cardSt.style.background = '#c0392b';
+        document.getElementById('kpiStatusTexto').textContent = 'REVISAR CADASTRO';
+        document.getElementById('kpiStatusSub').textContent = 'Diferença: R$ ' + fmtNum(diff);
+      }
+
+      // Tabela por Grupo
+      const ordemGrupos = ["VDP", "APOIO", "PLAT", "V&R", "VDG", "DIR", "VDE", "VDI"];
+      const tbGrupos = document.getElementById('tbodyPainelGrupos');
+      tbGrupos.innerHTML = '';
+
+      ordemGrupos.forEach(siglaG => {
+        const doGrupo = linhas.filter(l => l.g === siglaG);
+        const cG = doGrupo.reduce((a, b) => a + b.cons, 0);
+        const gG = doGrupo.reduce((a, b) => a + b.gas, 0);
+        const tG = cG + gG;
+        const pG = totGeral > 0 ? (tG / totGeral) * 100 : 0;
+        const tr = document.createElement('tr');
+        tr.innerHTML = `
+          <td><strong>${siglaG}</strong></td>
+          <td>${NOMES_GRUPOS[siglaG] || siglaG}</td>
+          <td style="text-align:right">${fmtNum(cG)}</td>
+          <td style="text-align:right">${fmtNum(gG)}</td>
+          <td style="text-align:right"><strong>${fmtNum(tG)}</strong></td>
+          <td style="text-align:right">${pG.toFixed(1).replace('.', ',')}%</td>
+        `;
+        tbGrupos.appendChild(tr);
+      });
+
+      const trTotG = document.createElement('tr');
+      trTotG.className = 'tot';
+      trTotG.innerHTML = `
+        <td colspan="2">TOTAL</td>
+        <td style="text-align:right">${fmtNum(totConsumo)}</td>
+        <td style="text-align:right">${fmtNum(totGas)}</td>
+        <td style="text-align:right">${fmtNum(totGeral)}</td>
+        <td style="text-align:right">100,0%</td>
+      `;
+      tbGrupos.appendChild(trTotG);
+
+      // Top 10 Unidades
+      const top10 = [...linhas].sort((a, b) => b.tot - a.tot).slice(0, 10);
+      const tbTop10 = document.getElementById('tbodyPainelTop10');
+      tbTop10.innerHTML = '';
+      top10.forEach((item, idx) => {
+        const tr = document.createElement('tr');
+        tr.innerHTML = `
+          <td>${idx + 1}</td>
+          <td><strong>${item.s || item.c}</strong></td>
+          <td>${item.d}</td>
+          <td style="text-align:right">${fmtNum(item.tot)}</td>
+          <td style="text-align:right">${item.pct.toFixed(1).replace('.', ',')}%</td>
+        `;
+        tbTop10.appendChild(tr);
+      });
+    }
+
+    function renderCharts() {
+      const { linhas } = calcularConsolidado();
+      const ordemGrupos = ["VDP", "APOIO", "PLAT", "V&R", "VDG", "DIR", "VDE", "VDI"];
+      const consPorGrupo = ordemGrupos.map(g => linhas.filter(l => l.g === g).reduce((a, b) => a + b.cons, 0));
+      const gasPorGrupo = ordemGrupos.map(g => linhas.filter(l => l.g === g).reduce((a, b) => a + b.gas, 0));
+
+      const ctx1 = document.getElementById('chartGrupos').getContext('2d');
+      if (chartGruposInstance) chartGruposInstance.destroy();
+      chartGruposInstance = new Chart(ctx1, {
+        type: 'bar',
+        data: {
+          labels: ordemGrupos,
+          datasets: [
+            { label: 'Consumo (Tesouro)', data: consPorGrupo, backgroundColor: '#1f3a5f' },
+            { label: 'Gás no Período', data: gasPorGrupo, backgroundColor: '#1b998b' }
+          ]
+        },
+        options: { responsive: true, plugins: { legend: { position: 'bottom' } } }
+      });
+
+      const nomesMeses = ["JAN","FEV","MAR","ABR","MAI","JUN","JUL","AGO","SET","OUT","NOV","DEZ"];
+      const totaisMensais = new Array(12).fill(0);
+      gasesData.forEach(r => {
+        for (let m = 0; m < 12; m++) totaisMensais[m] += (Number(r.m[m]) || 0);
+      });
+
+      const ctx2 = document.getElementById('chartGasesMensal').getContext('2d');
+      if (chartGasesInstance) chartGasesInstance.destroy();
+      chartGasesInstance = new Chart(ctx2, {
+        type: 'line',
+        data: {
+          labels: nomesMeses,
+          datasets: [{
+            label: 'Total Mensal de Gases (R$)',
+            data: totaisMensais,
+            borderColor: '#00b0f0',
+            backgroundColor: 'rgba(0,176,240,0.18)',
+            fill: true,
+            tension: 0.25
+          }]
+        },
+        options: { responsive: true, plugins: { legend: { position: 'bottom' } } }
+      });
+    }
+
+    // =========================================================================
+    // 8. INTEGRAÇÃO EM TEMPO REAL COM O GOOGLE SHEETS
+    // =========================================================================
+    async function sincronizarDoGoogleSheets() {
+      if (!GOOGLE_SCRIPT_URL) return;
+      const badge = document.getElementById('badgeSync');
+      try {
+        badge.textContent = "SINCRONIZANDO...";
+        const res = await fetch(GOOGLE_SCRIPT_URL);
+        const data = await res.json();
+        if (data && data.ok) {
+          if (data.gases && data.gases.length) gasesData = data.gases;
+          if (data.tesouro && data.tesouro.length) tesouroData = data.tesouro;
+          if (data.periodo) {
+            document.getElementById('lblPeriodoTopo').textContent = data.periodo;
+            document.getElementById('lblPeriodoConsumo').textContent = data.periodo;
+          }
+          if (data.ultCarga) {
+            document.getElementById('lblUltimaCarga').textContent = data.ultCarga;
+          }
+          recalcAll();
+          badge.className = "badge-ok";
+          badge.textContent = "SINCRONIZADO COM GOOGLE SHEETS";
+        }
+      } catch (err) {
+        badge.className = "badge-warn";
+        badge.textContent = "MODO LOCAL (VERIFIQUE PERMISSÃO DO SCRIPT)";
+      }
+    }
+
+    async function salvarGasesNoGoogleSheets(mostrarAviso) {
+      if (!GOOGLE_SCRIPT_URL) return;
+      try {
+        await fetch(GOOGLE_SCRIPT_URL, {
+          method: "POST",
+          mode: "no-cors",
+          headers: { "Content-Type": "text/plain;charset=utf-8" },
+          body: JSON.stringify({ action: "salvarGases", gases: gasesData })
+        });
+        if (mostrarAviso) showToast("Gastos de gases salvos na Planilha Google!");
+      } catch (e) {
+        console.error(e);
+      }
+    }
+
+    async function salvarTesouroNoGoogleSheets(periodo) {
+      if (!GOOGLE_SCRIPT_URL) return;
+      try {
+        await fetch(GOOGLE_SCRIPT_URL, {
+          method: "POST",
+          mode: "no-cors",
+          headers: { "Content-Type": "text/plain;charset=utf-8" },
+          body: JSON.stringify({ action: "importarTesouro", periodo: periodo, tesouro: tesouroData })
+        });
+      } catch (e) {
+        console.error(e);
+      }
+    }
+
+    function recalcAll() {
+      renderGases();
+      renderConsumo();
+      renderTesouro();
+      renderPainel();
+    }
+
+    window.addEventListener('DOMContentLoaded', () => {
+      popularSelectRapidoGases();
+      recalcAll();
+      sincronizarDoGoogleSheets();
+    });
+  </script>
+</body>
+</html>
