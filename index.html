@@ -263,7 +263,7 @@
     }
 
     /* =====================================================================
-       ABA 3: Consumoe Gas Anual (TESOURO)
+       ABA 3: Consumo Gas Anual por Unidade (TESOURO)
        ===================================================================== */
     .dropzone {
       border: 2px dashed #4c6a92;
@@ -377,6 +377,30 @@
       .topbar, .tabs-bar, .toolbar, #toast { display: none !important; }
       .tab-panel { box-shadow: none; padding: 0; }
     }
+
+    /* ===== MELHORIAS: tela cheia, legibilidade, cabeçalho fixo ===== */
+    .container { max-width: none !important; padding: 12px 16px 40px; }
+    .table-scroll { max-height: calc(100vh - 270px); overflow: auto; }
+    table.gases-table { font-size: 15px; width: 100%; }
+    table.gases-table th, table.gases-table td { padding: 7px 8px !important; font-size: 15px !important; }
+    .gases-hdr-month { font-size: 14px !important; min-width: 105px !important; }
+    .gases-val-cell input { font-size: 15px !important; height: 34px; min-width: 100px; text-align: right; }
+    .gases-id-cell { font-size: 14px !important; white-space: nowrap; }
+    table.gases-table thead tr:last-child th { position: sticky; top: 0; z-index: 3; }
+    .gases-footer-row td { position: sticky; bottom: 0; z-index: 3; font-size: 15px !important; }
+    .consumo-table { font-size: 14px !important; width: 100%; }
+    .consumo-table td, .consumo-table th { padding: 6px 8px !important; }
+    .toolbar select, .toolbar input, .toolbar .btn { font-size: 15px !important; padding: 8px 10px !important; }
+    .tab-btn { font-size: 15px !important; }
+    .tab-btn .cnt { background:#c0392b; color:#fff; border-radius:10px; padding:1px 7px; font-size:12px; margin-left:6px; }
+    .tab-btn .cnt.ok { background:#2e8b57; }
+    .alerta { display:flex; gap:12px; align-items:flex-start; padding:12px 14px; margin:8px 0; border-radius:8px; border-left:6px solid; background:#fff; box-shadow:0 1px 3px rgba(0,0,0,.12); }
+    .alerta.erro { border-color:#c0392b; background:#fdecea; } .alerta.aviso { border-color:#d97706; background:#fff6e5; }
+    .alerta.ok { border-color:#2e8b57; background:#eaf7ef; } .alerta b { display:block; font-size:15px; } .alerta span { font-size:13px; color:#333; }
+    .cons-grupos { margin-top:22px; max-width:760px; } .cons-grupos table { border-collapse:collapse; width:100%; font-size:14px; }
+    .cons-grupos th, .cons-grupos td { border:1px solid #444; padding:6px 10px; } .cons-grupos th { background:#d9d9d9; }
+    .cons-grupos td.n { text-align:right; } .cons-grupos tr.tg td { background:#808080; color:#fff; font-weight:bold; }
+    .cons-grupos .geral { display:flex; justify-content:space-between; border:1px solid #000; padding:8px 12px; font-weight:bold; margin-bottom:12px; background:#fff; }
   </style>
 </head>
 <body>
@@ -417,14 +441,22 @@
       <span class="tab-dot" style="background:#ffc000"></span> 2. CONSUMO (Copiar p/ Sistema)
     </button>
     <button class="tab-btn" onclick="openTab('tabTesouro', this)">
-      <span class="tab-dot" style="background:#e6a700"></span> 3. Consumoe Gas Anual
+      <span class="tab-dot" style="background:#e6a700"></span> 3. Consumo Gas Anual por Unidade
     </button>
     <button class="tab-btn" onclick="openTab('tabPainel', this)">
       <span class="tab-dot" style="background:#1f3a5f"></span> 4. PAINEL Executivo
     </button>
+    <button class="tab-btn" onclick="openTab('tabAlertas', this)">
+      <span class="tab-dot" style="background:#c0392b"></span> 5. ALERTAS <span class="cnt ok" id="cntAlertas">0</span>
+    </button>
   </div>
 
   <div class="container">
+    <div id="tabAlertas" class="tab-panel">
+      <h2 style="margin:6px 0">Alertas e conferência automática</h2>
+      <p style="margin:0 0 8px;color:#555;font-size:13px">Tudo que precisa de atenção antes de fechar o mês. Atualiza sozinho a cada lançamento ou importação.</p>
+      <div id="listaAlertas"></div>
+    </div>
 
     <!-- ===================================================================
          ABA 1: GASES_MENSAL (Idêntica à GASTOS DE GASES POR GRUPO 2026.xlsx)
@@ -527,11 +559,12 @@
           </thead>
           <tbody id="tbodyConsumo"></tbody>
         </table>
+      <div class="cons-grupos" id="consGrupos"></div>
       </div>
     </div>
 
     <!-- ===================================================================
-         ABA 3: Consumoe Gas Anual (Antiga TESOURO)
+         ABA 3: Consumo Gas Anual por Unidade (Antiga TESOURO)
          =================================================================== -->
     <div id="tabTesouro" class="tab-panel">
       <div class="dropzone" onclick="document.getElementById('fileInputTesouro').click()">
@@ -1050,7 +1083,7 @@
     }
 
     // =========================================================================
-    // 6. RENDERIZAÇÃO E IMPORTAÇÃO DA ABA 3: Consumoe Gas Anual
+    // 6. RENDERIZAÇÃO E IMPORTAÇÃO DA ABA 3: Consumo Gas Anual por Unidade
     // =========================================================================
     function renderTesouro() {
       const tbody = document.getElementById('tbodyTesouro');
@@ -1271,6 +1304,8 @@
             document.getElementById('lblPeriodoTopo').textContent = data.periodo;
             document.getElementById('lblPeriodoConsumo').textContent = data.periodo;
           }
+          if (data.consumo) consumoPlanilha = data.consumo;
+          syncErro = false;
           if (data.ultCarga) {
             document.getElementById('lblUltimaCarga').textContent = data.ultCarga;
           }
@@ -1279,6 +1314,7 @@
           badge.textContent = "SINCRONIZADO COM GOOGLE SHEETS";
         }
       } catch (err) {
+        syncErro = true; recalcAll();
         badge.className = "badge-warn";
         badge.textContent = "MODO LOCAL (VERIFIQUE PERMISSÃO DO SCRIPT)";
       }
@@ -1313,7 +1349,57 @@
       }
     }
 
+
+    // =========================================================================
+    // MELHORIAS: CONSOLIDADO POR GRUPO (igual ao fim da planilha VBA) + ALERTAS
+    // =========================================================================
+    let syncErro = false, consumoPlanilha = null;
+    const ORDEM_G = ["VDP","APOIO","PLAT","V&R","VDG","DIR","VDE","VDI"];
+    function renderConsGrupos() {
+      const { linhas, totConsumo, totGas, totGeral } = calcularConsolidado();
+      const pct = v => (totGeral > 0 ? (v / totGeral * 100) : 0).toFixed(0) + '%';
+      let r = `<div class="geral"><span>TOTAL GERAL</span><span>Consumo R$ ${fmtNum(totConsumo)}</span><span>Gás R$ ${fmtNum(totGas)}</span><span>R$ ${fmtNum(totGeral)}</span></div>
+        <table><tr><th></th><th>CONSUMO</th><th>GÁS</th><th>TOTAL</th><th>%</th></tr>`;
+      ORDEM_G.forEach(g => {
+        const L = linhas.filter(l => l.g === g), c = L.reduce((a,b)=>a+b.cons,0), s = L.reduce((a,b)=>a+b.gas,0);
+        r += `<tr><td><b>${NOMES_GRUPOS[g]}</b></td><td class="n">${fmtNum(c)}</td><td class="n">${fmtNum(s)}</td><td class="n">${fmtNum(c+s)}</td><td class="n">${pct(c+s)}</td></tr>`;
+      });
+      r += `<tr class="tg"><td>TOTAL</td><td class="n">${fmtNum(totConsumo)}</td><td class="n">${fmtNum(totGas)}</td><td class="n">${fmtNum(totGeral)}</td><td class="n">100%</td></tr>
+        <tr><td><b>%</b></td><td class="n">${pct(totConsumo)}</td><td class="n">${pct(totGas)}</td><td class="n">100%</td><td></td></tr></table>`;
+      document.getElementById('consGrupos').innerHTML = r;
+    }
+    function computeAlertas() {
+      const A = [], cods = new Set(UNIDADES.map(u => u.c));
+      const mIni = parseInt(document.getElementById('selMesIni').value,10), mFim = parseInt(document.getElementById('selMesFim').value,10);
+      const nm = ["JAN","FEV","MAR","ABR","MAI","JUN","JUL","AGO","SET","OUT","NOV","DEZ"];
+      const { totConsumo, totGas } = calcularConsolidado();
+      if (syncErro) A.push({n:'erro', t:'Sem conexão com o Google Sheets', d:'Os dados mostrados são locais e NÃO estão sendo salvos na planilha. Verifique a permissão/implantação do Apps Script.'});
+      const tes = {}; let somaTes = 0;
+      tesouroData.forEach(t => { const c = String(t.c).trim().padStart(9,'0'); tes[c] = (tes[c]||0)+1; somaTes += Number(t.v)||0;
+        if (!cods.has(c)) A.push({n:'erro', t:'COD do Tesouro sem cadastro: '+c, d:`${t.d} — R$ ${fmtNum(t.v)} ficaria fora do consolidado. Cadastre em UNIDADES.`}); });
+      Object.keys(tes).filter(c => tes[c] > 1).forEach(c => A.push({n:'aviso', t:'COD duplicado no Tesouro: '+c, d:'Aparece '+tes[c]+' vezes; os valores são somados.'}));
+      gasesData.forEach(g => { const c = String(g.c).trim().padStart(9,'0');
+        if (!cods.has(c)) A.push({n:'erro', t:'COD de gás não cadastrado: '+c, d:'Gás lançado em GASES_MENSAL sem unidade correspondente — não entra no consolidado.'});
+        g.m.forEach((v,i) => { if ((Number(v)||0) < 0) A.push({n:'aviso', t:'Valor negativo em '+c+' ('+nm[i]+')', d:'R$ '+fmtNum(v)}); }); });
+      const fora = gasesData.reduce((a,g)=>a+g.m.reduce((s,v,i)=>(i+1<mIni||i+1>mFim)?s+(Number(v)||0):s,0),0);
+      if (fora > 0) A.push({n:'aviso', t:'Gás fora do período selecionado', d:`R$ ${fmtNum(fora)} lançado em meses fora de ${nm[mIni-1]} a ${nm[mFim-1]} não entra no relatório por unidade.`});
+      for (let m = mIni-1; m < mFim; m++) if (!gasesData.some(g => Number(g.m[m]))) A.push({n:'aviso', t:'Nenhum gás lançado em '+nm[m], d:'Mês dentro do período, mas sem valores em GASES_MENSAL.'});
+      const dif = Math.abs(somaTes - totConsumo);
+      if (dif >= 0.01) A.push({n:'erro', t:'Tesouro × consolidado não confere', d:'Diferença de R$ '+fmtNum(dif)+' (normalmente COD sem cadastro).'});
+      if (consumoPlanilha && (Math.abs(consumoPlanilha.cons-totConsumo) > 0.01 || Math.abs(consumoPlanilha.gas-totGas) > 0.01))
+        A.push({n:'erro', t:'Aba CONSUMO da planilha diverge do sistema', d:`Planilha: consumo R$ ${fmtNum(consumoPlanilha.cons)} / gás R$ ${fmtNum(consumoPlanilha.gas)}. Sistema: R$ ${fmtNum(totConsumo)} / R$ ${fmtNum(totGas)}. Aguarde o recálculo ou recarregue.`});
+      return A;
+    }
+    function renderAlertas() {
+      const A = computeAlertas(), el = document.getElementById('listaAlertas'), cnt = document.getElementById('cntAlertas');
+      cnt.textContent = A.length; cnt.className = 'cnt' + (A.length ? '' : ' ok');
+      el.innerHTML = A.length ? A.map(a => `<div class="alerta ${a.n}"><div>${a.n==='erro'?'⛔':'⚠️'}</div><div><b>${a.t}</b><span>${a.d}</span></div></div>`).join('')
+        : '<div class="alerta ok"><div>✅</div><div><b>Tudo certo</b><span>Nenhum problema encontrado. Pronto para fechar.</span></div></div>';
+    }
+
     function recalcAll() {
+      renderConsGrupos();
+      renderAlertas();
       renderGases();
       renderConsumo();
       renderTesouro();
